@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Training outputs
+logs/
+models/*/config_*/
+*.pth
+*.zip
+*.pkl
+
+# Keep structure folders but not contents
+!models/dqn/.gitkeep
+!models/ppo/.gitkeep
+!models/a2c/.gitkeep
+!models/reinforce/.gitkeep
+!logs/.gitkeep
+
+# Generated plots
+*.png
+!assets/*.png
+*.jpg
+*.jpeg
+
+# Data
+*.csv
+*.json
+!requirements.txt
+
+# Temporary files
+*.tmp
+*.bak
