@@ -6,7 +6,16 @@ Visualizes individual agents with panic-based coloring and advanced features.
 
 Novel Features:
 - Individual agent visualization (not just density grid)
-- Panic-level coloring (blue=calm, orange=stressed, red=panic)
+- Panic-level coloring (blue=calm, orange=stressed,        # Controls
+        controls = OnscreenText(
+            text="[H] Heat Map | [R] Rotate | [Arrows] Move | [Q/E or PgUp/PgDn] Height",
+            pos=(0, -0.95),
+            scale=0.05,
+            fg=(0.8, 0.8, 0.8, 1),
+            align=TextNode.ACenter,
+            mayChange=False
+        )
+        self.hud_texts.append(controls))
 - Real-time panic indicator in HUD
 - Infrastructure state visualization (gate transitions, barrier cooldowns)
 """
@@ -65,19 +74,12 @@ class EnhancedCrowdRenderer(ShowBase):
         print("  [ESC] - Exit")
     
     def _setup_camera(self):
-        """Setup camera position and orientation"""
-        # Position camera at 45-degree angle view
-        # This gives a nice isometric-style view of the entire grid
-        center_x = self.grid_width / 2
-        center_y = self.grid_height / 2
+        """Configure camera position and orientation (matching original rendering.py)"""
+        self.camera.setPos(self.grid_width / 2, -30, 25)
+        self.camera.lookAt(self.grid_width / 2, self.grid_height / 2, 0)
         
-        # Calculate position for 45-degree angle
-        distance = 35  # Distance from center
-        height = 30    # Height above ground (45-degree angle when distance ≈ height)
-        
-        self.camera.setPos(center_x, center_y - distance, height)
-        self.camera.lookAt(center_x, center_y, 0)  # Look at center of grid
-        self.camLens.setFov(60)
+        # Enable camera movement
+        self.disableMouse()
     
     def _setup_lights(self):
         """Setup scene lighting"""

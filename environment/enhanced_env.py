@@ -160,6 +160,7 @@ class EnhancedCrowdControlEnv(gym.Env):
         self.total_agents_spawned = 0
         self.total_agents_exited = 0
         self.next_agent_id = 0
+        self._last_exit_count = 0  # For tracking exits per step
         
         # Reset infrastructure state
         self.gate_open_times = [0, 0, 0]
@@ -261,21 +262,21 @@ class EnhancedCrowdControlEnv(gym.Env):
             direction = self.np_random.integers(0, 4)
             moved = self._move_barrier(barrier_id, direction)
             if moved:
-                action_cost = 0.5  # Cost for moving barrier
+                action_cost = 0.1  # Reduced cost for moving barrier
             
         elif action < 7:  # Toggle gate
             gate_id = action - 4
             toggled = self._toggle_gate(gate_id)
             if toggled:
-                action_cost = 0.3  # Cost for gate action
+                action_cost = 0.05  # Reduced cost for gate action
             
         elif action < 11:  # Set flow direction
             flow_id = action - 7
             self._set_flow_direction(flow_id)
-            action_cost = 0.1
+            action_cost = 0.02  # Very light cost
             
         else:  # Emergency call
-            action_cost = 2.0  # High cost for emergency
+            action_cost = 1.0  # Moderate cost for emergency (reduced from 2.0)
             self._emergency_response()
         
         # Update infrastructure cooldowns
@@ -318,12 +319,12 @@ class EnhancedCrowdControlEnv(gym.Env):
         
         if max_density > self.CRITICAL_DENSITY:
             self.overcrowding_events += 1
-            reward -= 50.0
+            reward -= 20.0  # Reduced from 50.0 to match step reward scale
             terminated = True
         
         # Check for successful dispersal
         if len(self.agents) < 10 and self.timestep > 100:
-            reward += 100.0
+            reward += 30.0  # Reduced from 100.0 to match step reward scale
             terminated = True
         
         # Check for max steps
@@ -578,51 +579,69 @@ class EnhancedCrowdControlEnv(gym.Env):
                 self.velocity_y[y, x] = agent.vy
     
     def _calculate_density_reward(self) -> float:
-        """Reward for balanced density"""
+        """Reward for balanced density - NORMALIZED to prevent scaling issues"""
         reward = 0.0
         
-        # Penalize cells above target density
-        above_target = np.sum(np.maximum(0, self.grid_density - self.TARGET_DENSITY))
-        reward -= 0.5 * above_target
+        # Calculate average density (normalized by grid size)
+        total_cells = self.GRID_WIDTH * self.GRID_HEIGHT
+        avg_above_target = np.sum(np.maximum(0, self.grid_density - self.TARGET_DENSITY)) / total_cells
+        reward -= avg_above_target * 0.5  # Scaled to ~[-2, 0]
         
-        # Reward for keeping density below critical
-        critical_cells = np.sum(self.grid_density > (self.CRITICAL_DENSITY * 0.8))
-        reward -= 1.0 * critical_cells
+        # Heavy penalty only for truly dangerous density
+        critical_cells = np.sum(self.grid_density > self.CRITICAL_DENSITY)
+        if critical_cells > 0:
+            reward -= 3.0  # Fixed penalty, not scaled by count
+        
+        # Small reward for low average density
+        avg_density = np.mean(self.grid_density)
+        if avg_density < self.TARGET_DENSITY:
+            reward += 1.0
         
         return reward
     
     def _calculate_safety_reward(self) -> float:
-        """Enhanced safety with panic consideration - NOVEL CONTRIBUTION"""
+        """Enhanced safety with panic consideration - NOVEL CONTRIBUTION (NORMALIZED)"""
         reward = 0.0
         
-        # Density-based danger
-        dangerous_cells = np.sum(self.grid_density > (self.CRITICAL_DENSITY * 0.8))
-        reward -= 2.0 * dangerous_cells
-        
-        # Panic penalty
+        # Panic penalty (clamped to prevent explosion)
         if self.agents:
             avg_panic = np.mean([a.panic_level for a in self.agents])
-            reward -= 5.0 * avg_panic
+            reward -= np.clip(avg_panic * 3.0, 0, 3.0)  # Max penalty: -3.0
             
             # Severe penalty for extreme panic
             max_panic = max(a.panic_level for a in self.agents)
             if max_panic > 0.8:
-                reward -= 10.0
+                reward -= 2.0  # Fixed penalty
+            
+            # Reward for calm crowds
+            if avg_panic < 0.2:
+                reward += 1.0
+        else:
+            reward += 0.5  # Small bonus for empty venue
         
         return reward
     
     def _calculate_efficiency_reward(self) -> float:
-        """Reward for throughput"""
+        """Reward for throughput - NORMALIZED to prevent explosion"""
         reward = 0.0
         
-        # Reward for agents successfully exiting
-        if self.timestep > 0:
-            exit_rate = self.total_agents_exited / self.timestep
-            reward += exit_rate * 2.0
+        # Reward for agents successfully exiting (normalized per step, not cumulative)
+        # Track exits THIS step, not cumulative rate
+        if not hasattr(self, '_last_exit_count'):
+            self._last_exit_count = 0
+        
+        exits_this_step = self.total_agents_exited - self._last_exit_count
+        self._last_exit_count = self.total_agents_exited
+        reward += min(exits_this_step * 0.5, 3.0)  # Capped at +3.0 even if many exit
         
         # Penalize having too many agents waiting
         if len(self.agents) > self.MAX_AGENTS * 0.7:
             reward -= 1.0
+        
+        # Small reward for reducing crowd size
+        agent_ratio = len(self.agents) / self.MAX_AGENTS
+        if agent_ratio < 0.5:
+            reward += 0.5  # Bonus for keeping venue clear
         
         return reward
     
@@ -630,15 +649,15 @@ class EnhancedCrowdControlEnv(gym.Env):
         """Cost for using infrastructure - NOVEL CONTRIBUTION"""
         cost = 0.0
         
-        # Penalize active cooldowns (means we're moving things a lot)
+        # Light penalty for active cooldowns (reduced from 0.3)
         active_cooldowns = sum(1 for c in self.barrier_move_cooldown if c > 0)
-        cost += 0.3 * active_cooldowns
+        cost += 0.1 * active_cooldowns
         
         # Penalize having too many gates closed during peak times
         progress = self.timestep / self.MAX_STEPS
         if 0.2 < progress < 0.6:  # Peak arrival time
             closed_gates = sum(1 for g in self.gates if g[2] < 0.5)
-            cost += 1.0 * closed_gates
+            cost += 2.0 * closed_gates  # Increased - gates should be open during peak!
         
         return cost
     
