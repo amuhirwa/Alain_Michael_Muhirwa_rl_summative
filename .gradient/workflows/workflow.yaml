@@ -18,4 +18,4 @@ jobs:
         pip install cloudpickle
         
         # Run your training script
-        python training/curriculum_training.py
+        python full_script.py
