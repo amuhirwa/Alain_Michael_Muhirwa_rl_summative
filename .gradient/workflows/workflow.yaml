@@ -1,3 +1,7 @@
+'on':
+  github:
+    branches:
+      only: master
 jobs:
   CurriculumTraining:
     resources:
