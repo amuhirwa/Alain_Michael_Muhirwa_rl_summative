@@ -19,10 +19,11 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from environment.custom_env import CrowdControlEnv
+from environment.enhanced_env_fast import EnhancedCrowdControlEnvFast
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 import numpy as np
 import matplotlib.pyplot as plt
 import json
@@ -152,34 +153,34 @@ HYPERPARAMETER_CONFIGS = [
         "exploration_final_eps": 0.05,
         "learning_starts": 1500,
     },
-    {
-        "name": "config_11_fast_learner",
-        "learning_rate": 1e-3,
-        "buffer_size": 30000,
-        "batch_size": 32,
-        "gamma": 0.98,
-        "target_update_interval": 500,
-        "exploration_fraction": 0.25,
-        "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.05,
-        "learning_starts": 500,
-    },
-    {
-        "name": "config_12_patient",
-        "learning_rate": 1e-4,
-        "buffer_size": 100000,
-        "batch_size": 128,
-        "gamma": 0.995,
-        "target_update_interval": 1500,
-        "exploration_fraction": 0.5,
-        "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.1,
-        "learning_starts": 5000,
-    },
 ]
 
 
-def train_dqn_configuration(config, total_timesteps=100000, eval_freq=5000):
+def make_env(difficulty='medium', pattern='rush', adversarial=False):
+    """Create a single environment instance"""
+    def _init():
+        env = EnhancedCrowdControlEnvFast(
+            crowd_arrival_pattern=pattern,
+            adversarial_mode=adversarial,
+            difficulty=difficulty
+        )
+        env = Monitor(env)
+        return env
+    return _init
+
+
+def make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=8):
+    """Create vectorized environment with n_envs parallel environments"""
+    env_fns = [make_env(difficulty, pattern, adversarial) for _ in range(n_envs)]
+    try:
+        vec_env = SubprocVecEnv(env_fns)
+    except:
+        print("⚠️  SubprocVecEnv failed, falling back to DummyVecEnv")
+        vec_env = DummyVecEnv(env_fns)
+    return vec_env
+
+
+def train_dqn_configuration(config, total_timesteps=100000, eval_freq=5000, n_envs=1):
     """Train DQN with specific hyperparameter configuration"""
     
     print(f"\n{'='*70}")
@@ -197,13 +198,17 @@ def train_dqn_configuration(config, total_timesteps=100000, eval_freq=5000):
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
     
-    # Create environment
-    env = CrowdControlEnv()
-    env = Monitor(env, log_dir)
+    # DQN can use vectorized envs but typically benefits less than PPO
+    # n_envs=1 is often sufficient for DQN
+    if n_envs > 1:
+        print(f"Creating {n_envs} parallel environments...")
+        env = make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=n_envs)
+    else:
+        # Still wrap single env in DummyVecEnv for consistency
+        env = make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=1)
     
-    # Create evaluation environment
-    eval_env = CrowdControlEnv()
-    eval_env = Monitor(eval_env, log_dir + "/eval")
+    # Create evaluation environment (same type as training)
+    eval_env = make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=1)
     
     # Extract hyperparameters
     hp = {k: v for k, v in config.items() if k != 'name'}
@@ -223,7 +228,7 @@ def train_dqn_configuration(config, total_timesteps=100000, eval_freq=5000):
         learning_starts=hp['learning_starts'],
         train_freq=4,
         gradient_steps=1,
-        verbose=1,
+        verbose=0,
         tensorboard_log=log_dir,
         device='cuda' if torch.cuda.is_available() else 'cpu'
     )
@@ -439,6 +444,8 @@ def main():
                        help='Train specific configuration (0-11), or all if not specified')
     parser.add_argument('--timesteps', type=int, default=100000,
                        help='Total timesteps for training')
+    parser.add_argument('--n-envs', type=int, default=1,
+                       help='Number of parallel environments (1-2 recommended for DQN)')
     
     args = parser.parse_args()
     
@@ -446,11 +453,12 @@ def main():
         # Train specific configuration
         if 0 <= args.config < len(HYPERPARAMETER_CONFIGS):
             config = HYPERPARAMETER_CONFIGS[args.config]
-            train_dqn_configuration(config, total_timesteps=args.timesteps)
+            train_dqn_configuration(config, total_timesteps=args.timesteps, n_envs=args.n_envs)
         else:
             print(f"Error: Configuration index must be between 0 and {len(HYPERPARAMETER_CONFIGS)-1}")
     else:
         # Train all configurations
+        print(f"💡 Note: DQN typically doesn't benefit much from vectorization (using n_envs={args.n_envs})")
         train_all_configurations(timesteps_per_config=args.timesteps)
 
 

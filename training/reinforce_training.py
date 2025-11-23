@@ -17,7 +17,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from environment.custom_env import CrowdControlEnv
+from environment.enhanced_env_fast import EnhancedCrowdControlEnvFast
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -278,15 +278,7 @@ HYPERPARAMETER_CONFIGS = [
         "hidden_dims": [128, 128, 128],
     },
     {
-        "name": "config_9_balanced",
-        "learning_rate": 3e-3,
-        "gamma": 0.99,
-        "ent_coef": 0.02,
-        "use_baseline": True,
-        "hidden_dims": [128, 128],
-    },
-    {
-        "name": "config_10_aggressive",
+        "name": "config_9_aggressive",
         "learning_rate": 5e-3,
         "gamma": 0.98,
         "ent_coef": 0.03,
@@ -294,15 +286,7 @@ HYPERPARAMETER_CONFIGS = [
         "hidden_dims": [128, 64],
     },
     {
-        "name": "config_11_conservative",
-        "learning_rate": 5e-4,
-        "gamma": 0.995,
-        "ent_coef": 0.005,
-        "use_baseline": True,
-        "hidden_dims": [256, 256],
-    },
-    {
-        "name": "config_12_optimized",
+        "name": "config_10_optimized",
         "learning_rate": 2e-3,
         "gamma": 0.99,
         "ent_coef": 0.015,
@@ -330,8 +314,12 @@ def train_reinforce_configuration(config, num_episodes=1000, eval_freq=100):
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
     
-    # Create environment
-    env = CrowdControlEnv()
+    # Create environment with optimized parameters
+    env = EnhancedCrowdControlEnvFast(
+        crowd_arrival_pattern='rush',
+        adversarial_mode=False,
+        difficulty='medium'
+    )
     
     # Create agent
     state_dim = env.observation_space.shape[0]

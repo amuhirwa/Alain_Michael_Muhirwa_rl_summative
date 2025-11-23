@@ -11,6 +11,8 @@ Usage:
 
 import sys
 import os
+
+from full_script import EnhancedCrowdControlEnv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from environment.custom_env import CrowdControlEnv
@@ -31,7 +33,7 @@ def main():
     print("="*60)
     
     # Create environment with rendering
-    env = CrowdControlEnv(render_mode='human')
+    env = EnhancedCrowdControlEnv(render_mode='human')
     
     # Reset environment
     obs, info = env.reset()

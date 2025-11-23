@@ -20,10 +20,11 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from environment.custom_env import CrowdControlEnv
+from environment.enhanced_env_fast import EnhancedCrowdControlEnvFast
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 import numpy as np
 import matplotlib.pyplot as plt
 import json
@@ -118,18 +119,6 @@ HYPERPARAMETER_CONFIGS = [
         "ent_coef": 0.05,
     },
     {
-        "name": "config_8_balanced",
-        "learning_rate": 5e-4,
-        "n_steps": 3072,
-        "batch_size": 96,
-        "n_epochs": 15,
-        "gamma": 0.995,
-        "gae_lambda": 0.97,
-        "clip_range": 0.25,
-        "vf_coef": 0.6,
-        "ent_coef": 0.02,
-    },
-    {
         "name": "config_9_aggressive",
         "learning_rate": 1e-3,
         "n_steps": 1024,
@@ -154,19 +143,7 @@ HYPERPARAMETER_CONFIGS = [
         "ent_coef": 0.005,
     },
     {
-        "name": "config_11_exploration",
-        "learning_rate": 5e-4,
-        "n_steps": 2048,
-        "batch_size": 64,
-        "n_epochs": 10,
-        "gamma": 0.99,
-        "gae_lambda": 0.95,
-        "clip_range": 0.2,
-        "vf_coef": 0.5,
-        "ent_coef": 0.1,
-    },
-    {
-        "name": "config_12_optimized",
+        "name": "config_10_optimized",
         "learning_rate": 3e-4,
         "n_steps": 2560,
         "batch_size": 80,
@@ -180,7 +157,33 @@ HYPERPARAMETER_CONFIGS = [
 ]
 
 
-def train_ppo_configuration(config, total_timesteps=200000, eval_freq=10000):
+def make_env(difficulty='medium', pattern='rush', adversarial=False):
+    """Create a single environment instance"""
+    def _init():
+        env = EnhancedCrowdControlEnvFast(
+            crowd_arrival_pattern=pattern,
+            adversarial_mode=adversarial,
+            difficulty=difficulty
+        )
+        env = Monitor(env)
+        return env
+    return _init
+
+
+def make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=8):
+    """Create vectorized environment with n_envs parallel environments"""
+    env_fns = [make_env(difficulty, pattern, adversarial) for _ in range(n_envs)]
+    # Use SubprocVecEnv for true parallelism (faster but more CPU)
+    # Use DummyVecEnv for sequential execution (safer, less resource intensive)
+    try:
+        vec_env = SubprocVecEnv(env_fns)
+    except:
+        print("⚠️  SubprocVecEnv failed, falling back to DummyVecEnv")
+        vec_env = DummyVecEnv(env_fns)
+    return vec_env
+
+
+def train_ppo_configuration(config, total_timesteps=200000, eval_freq=10000, n_envs=8):
     """Train PPO with specific hyperparameter configuration"""
     
     print(f"\n{'='*70}")
@@ -198,13 +201,12 @@ def train_ppo_configuration(config, total_timesteps=200000, eval_freq=10000):
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
     
-    # Create environment
-    env = CrowdControlEnv()
-    env = Monitor(env, log_dir)
+    # Create VECTORIZED training environment (faster!)
+    print(f"Creating {n_envs} parallel environments...")
+    env = make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=n_envs)
     
-    # Create evaluation environment
-    eval_env = CrowdControlEnv()
-    eval_env = Monitor(eval_env, log_dir + "/eval")
+    # Create evaluation environment (wrapped in DummyVecEnv to match training env type)
+    eval_env = make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=1)
     
     # Extract hyperparameters
     hp = {k: v for k, v in config.items() if k != 'name'}
@@ -222,7 +224,7 @@ def train_ppo_configuration(config, total_timesteps=200000, eval_freq=10000):
         clip_range=hp['clip_range'],
         vf_coef=hp['vf_coef'],
         ent_coef=hp['ent_coef'],
-        verbose=1,
+        verbose=0,
         tensorboard_log=log_dir,
         device='cuda' if torch.cuda.is_available() else 'cpu'
     )
@@ -438,6 +440,8 @@ def main():
                        help='Train specific configuration (0-11), or all if not specified')
     parser.add_argument('--timesteps', type=int, default=200000,
                        help='Total timesteps for training')
+    parser.add_argument('--n-envs', type=int, default=4,
+                       help='Number of parallel environments (2-8 recommended)')
     
     args = parser.parse_args()
     
@@ -445,11 +449,13 @@ def main():
         # Train specific configuration
         if 0 <= args.config < len(HYPERPARAMETER_CONFIGS):
             config = HYPERPARAMETER_CONFIGS[args.config]
-            train_ppo_configuration(config, total_timesteps=args.timesteps)
+            train_ppo_configuration(config, total_timesteps=args.timesteps, n_envs=args.n_envs)
         else:
             print(f"Error: Configuration index must be between 0 and {len(HYPERPARAMETER_CONFIGS)-1}")
     else:
         # Train all configurations
+        print(f"⚠️  Training all configs with {args.n_envs} parallel environments per config")
+        print(f"    This will use significant CPU resources!")
         train_all_configurations(timesteps_per_config=args.timesteps)
 
 

@@ -8,6 +8,8 @@ to avoid freezing issues.
 
 import sys
 import os
+
+from environment.enhanced_env_fast import EnhancedCrowdControlEnvFast
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from environment.enhanced_env import EnhancedCrowdControlEnv
@@ -44,7 +46,7 @@ class CrowdControlDemo(ShowBase):
         print("="*70)
         
         # Create environment WITHOUT rendering
-        self.env = EnhancedCrowdControlEnv(
+        self.env = EnhancedCrowdControlEnvFast(
             render_mode=None,  # We'll handle rendering separately
             crowd_arrival_pattern=pattern,
             adversarial_mode=adversarial,
@@ -112,10 +114,11 @@ class CrowdControlDemo(ShowBase):
         """Update the 3D visualization"""
         self.renderer.update_scene(
             agents=self.env.agents,
-            gates=self.env.gates,
-            barriers=self.env.barriers,
+            gates=[tuple(g) for g in self.env.gates],          # list of (x,y,is_open,capacity)
+            barriers=[tuple(b) for b in self.env.barriers],    # list of (x,y)
             info=self.info
         )
+
     
     def print_final_stats(self):
         """Print final statistics"""

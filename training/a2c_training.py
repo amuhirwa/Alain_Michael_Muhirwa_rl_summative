@@ -19,10 +19,11 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from environment.custom_env import CrowdControlEnv
+from environment.enhanced_env_fast import EnhancedCrowdControlEnvFast
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 import numpy as np
 import matplotlib.pyplot as plt
 import json
@@ -113,17 +114,7 @@ HYPERPARAMETER_CONFIGS = [
         "rms_prop_eps": 1e-6,
     },
     {
-        "name": "config_9_conservative",
-        "learning_rate": 3e-4,
-        "n_steps": 15,
-        "gamma": 0.995,
-        "gae_lambda": 0.98,
-        "vf_coef": 0.7,
-        "ent_coef": 0.005,
-        "rms_prop_eps": 1e-5,
-    },
-    {
-        "name": "config_10_exploration",
+        "name": "config_9_exploration",
         "learning_rate": 7e-4,
         "n_steps": 5,
         "gamma": 0.99,
@@ -133,7 +124,7 @@ HYPERPARAMETER_CONFIGS = [
         "rms_prop_eps": 1e-5,
     },
     {
-        "name": "config_11_optimized",
+        "name": "config_10_optimized",
         "learning_rate": 6e-4,
         "n_steps": 7,
         "gamma": 0.99,
@@ -142,20 +133,34 @@ HYPERPARAMETER_CONFIGS = [
         "ent_coef": 0.015,
         "rms_prop_eps": 5e-6,
     },
-    {
-        "name": "config_12_patient",
-        "learning_rate": 3e-4,
-        "n_steps": 20,
-        "gamma": 0.995,
-        "gae_lambda": 0.95,
-        "vf_coef": 0.6,
-        "ent_coef": 0.01,
-        "rms_prop_eps": 1e-5,
-    },
 ]
 
 
-def train_a2c_configuration(config, total_timesteps=150000, eval_freq=10000):
+def make_env(difficulty='medium', pattern='rush', adversarial=False):
+    """Create a single environment instance"""
+    def _init():
+        env = EnhancedCrowdControlEnvFast(
+            crowd_arrival_pattern=pattern,
+            adversarial_mode=adversarial,
+            difficulty=difficulty
+        )
+        env = Monitor(env)
+        return env
+    return _init
+
+
+def make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=8):
+    """Create vectorized environment with n_envs parallel environments"""
+    env_fns = [make_env(difficulty, pattern, adversarial) for _ in range(n_envs)]
+    try:
+        vec_env = SubprocVecEnv(env_fns)
+    except:
+        print("⚠️  SubprocVecEnv failed, falling back to DummyVecEnv")
+        vec_env = DummyVecEnv(env_fns)
+    return vec_env
+
+
+def train_a2c_configuration(config, total_timesteps=150000, eval_freq=10000, n_envs=8):
     """Train A2C with specific hyperparameter configuration"""
     
     print(f"\n{'='*70}")
@@ -173,13 +178,12 @@ def train_a2c_configuration(config, total_timesteps=150000, eval_freq=10000):
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
     
-    # Create environment
-    env = CrowdControlEnv()
-    env = Monitor(env, log_dir)
+    # A2C benefits significantly from vectorized environments
+    print(f"Creating {n_envs} parallel environments...")
+    env = make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=n_envs)
     
-    # Create evaluation environment
-    eval_env = CrowdControlEnv()
-    eval_env = Monitor(eval_env, log_dir + "/eval")
+    # Create evaluation environment (same type as training)
+    eval_env = make_vec_env(difficulty='medium', pattern='rush', adversarial=False, n_envs=1)
     
     # Extract hyperparameters
     hp = {k: v for k, v in config.items() if k != 'name'}
@@ -195,7 +199,7 @@ def train_a2c_configuration(config, total_timesteps=150000, eval_freq=10000):
         vf_coef=hp['vf_coef'],
         ent_coef=hp['ent_coef'],
         rms_prop_eps=hp['rms_prop_eps'],
-        verbose=1,
+        verbose=0,
         tensorboard_log=log_dir,
         device='cuda' if torch.cuda.is_available() else 'cpu'
     )
@@ -411,6 +415,8 @@ def main():
                        help='Train specific configuration (0-11), or all if not specified')
     parser.add_argument('--timesteps', type=int, default=150000,
                        help='Total timesteps for training')
+    parser.add_argument('--n-envs', type=int, default=4,
+                       help='Number of parallel environments (4-8 recommended for A2C)')
     
     args = parser.parse_args()
     
@@ -418,11 +424,12 @@ def main():
         # Train specific configuration
         if 0 <= args.config < len(HYPERPARAMETER_CONFIGS):
             config = HYPERPARAMETER_CONFIGS[args.config]
-            train_a2c_configuration(config, total_timesteps=args.timesteps)
+            train_a2c_configuration(config, total_timesteps=args.timesteps, n_envs=args.n_envs)
         else:
             print(f"Error: Configuration index must be between 0 and {len(HYPERPARAMETER_CONFIGS)-1}")
     else:
         # Train all configurations
+        print(f"⚡ A2C benefits greatly from vectorization (using {args.n_envs} parallel environments)")
         train_all_configurations(timesteps_per_config=args.timesteps)
 
 

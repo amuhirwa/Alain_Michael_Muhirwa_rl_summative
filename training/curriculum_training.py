@@ -19,7 +19,9 @@ before facing complex emergency scenarios.
 
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from environment.enhanced_env_fast import EnhancedCrowdControlEnvFast
 
 from environment.custom_env import CrowdControlEnv
 from environment.enhanced_env import EnhancedCrowdControlEnv
@@ -52,7 +54,10 @@ def create_env_with_curriculum(difficulty='easy', pattern='steady', adversarial=
     
     NOVEL: Parameterized difficulty for curriculum learning
     """
-    env = CrowdControlEnv(
+    env = EnhancedCrowdControlEnvFast(
+        crowd_arrival_pattern=pattern,
+        adversarial_mode=adversarial,
+        difficulty=difficulty
     )
     return env
 
@@ -145,7 +150,7 @@ def train_with_curriculum_ppo(
                     "MlpPolicy",
                     env,
                     learning_rate=learning_rate,
-                    n_steps=256,
+                    n_steps=512,
                     batch_size=64,
                     n_epochs=10,
                     gamma=0.99,
