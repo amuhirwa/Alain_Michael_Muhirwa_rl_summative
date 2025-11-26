@@ -1,0 +1,11 @@
+Model Information:
+* title:	Humanoid
+* source:	https://sketchfab.com/3d-models/humanoid-102fa1536c454566b4169acb4458e4b9
+* author:	Diamondas (https://sketchfab.com/Diamondas)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Humanoid" (https://sketchfab.com/3d-models/humanoid-102fa1536c454566b4169acb4458e4b9) by Diamondas (https://sketchfab.com/Diamondas) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

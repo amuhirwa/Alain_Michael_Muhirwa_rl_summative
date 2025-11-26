@@ -27,7 +27,15 @@ from panda3d.core import (CardMaker, AmbientLight, DirectionalLight, PointLight,
 from direct.gui.OnscreenText import OnscreenText, TextNode
 from direct.task import Task
 import numpy as np
+import os
 from typing import List, Dict
+
+# Try to import GLTF support
+try:
+    import gltf
+    GLTF_AVAILABLE = True
+except ImportError:
+    GLTF_AVAILABLE = False
 
 
 class EnhancedCrowdRenderer(ShowBase):
@@ -43,6 +51,8 @@ class EnhancedCrowdRenderer(ShowBase):
         # Agent visualization
         self.agent_nodes = []
         self.max_agent_nodes = 200
+        self.agent_model_template = None  # 3D model template for agents
+        self.gate_model_template = None   # 3D model template for gates
         
         # Scene objects
         self.gate_nodes = []
@@ -58,6 +68,7 @@ class EnhancedCrowdRenderer(ShowBase):
         # Initialize scene
         self._setup_camera()
         self._setup_lights()
+        self._load_3d_models()  # Load 3D models before initializing scene
         self._initialize_scene_objects()
         self._setup_controls()
         self._setup_hud()
@@ -75,7 +86,7 @@ class EnhancedCrowdRenderer(ShowBase):
     
     def _setup_camera(self):
         """Configure camera position and orientation (matching original rendering.py)"""
-        self.camera.setPos(self.grid_width / 2, -30, 25)
+        self.camera.setPos(self.grid_width / 2, -18, 22)
         self.camera.lookAt(self.grid_width / 2, self.grid_height / 2, 0)
         
         # Enable camera movement
@@ -102,6 +113,59 @@ class EnhancedCrowdRenderer(ShowBase):
         plnp = self.render.attachNewNode(plight)
         plnp.setPos(10, 10, 15)
         self.render.setLight(plnp)
+    
+    def _load_3d_models(self):
+        """Load external 3D models (humanoid for agents, door for gates)"""
+        print("\n🎨 Loading 3D models...")
+        
+        # Try to load humanoid model for agents
+        humanoid_paths = [
+            "3d_models/humanoid2/scene.bam",   # Try converted format first (fastest)
+            "3d_models/humanoid2/scene.gltf",  # Then GLTF
+            "3d_models/humanoid2/scene.glb",   # Binary GLTF
+        ]
+        
+        for path in humanoid_paths:
+            if os.path.exists(path):
+                try:
+                    self.agent_model_template = self.loader.loadModel(path)
+                    if self.agent_model_template and not self.agent_model_template.isEmpty():
+                        # Scale to appropriate size for grid
+                        self.agent_model_template.setScale(1.0, 1.0, 1.0)
+                        print(f"   ✓ Loaded humanoid model from {path}")
+                        break
+                    else:
+                        print(f"   ⚠ {path} loaded but is empty")
+                except Exception as e:
+                    print(f"   ✗ Failed to load {path}: {e}")
+        
+        if self.agent_model_template is None:
+            print("   → Using procedural geometry for agents (no 3D model found)")
+        
+        # Try to load door model for gates
+        door_paths = [
+            "3d_models/door/scene.bam",
+            "3d_models/door/scene.gltf",
+            "3d_models/door/scene.glb",
+        ]
+        
+        for path in door_paths:
+            if os.path.exists(path):
+                try:
+                    self.gate_model_template = self.loader.loadModel(path)
+                    if self.gate_model_template and not self.gate_model_template.isEmpty():
+                        self.gate_model_template.setScale(0.5, 0.5, 0.5)
+                        print(f"   ✓ Loaded door model from {path}")
+                        break
+                    else:
+                        print(f"   ⚠ {path} loaded but is empty")
+                except Exception as e:
+                    print(f"   ✗ Failed to load {path}: {e}")
+        
+        if self.gate_model_template is None:
+            print("   → Using procedural geometry for gates (no 3D model found)")
+        
+        print()
     
     def _load_model_or_fallback(self, model_path, width, depth, height):
         """
@@ -188,39 +252,53 @@ class EnhancedCrowdRenderer(ShowBase):
         wall_height = 3.0
         wall_thickness = 0.3
         
-        # Top wall
+        # Top wall (translucent)
         top_wall = self._create_box(self.grid_width/2, 0, self.grid_width, wall_thickness, wall_height)
-        top_wall.setColor(0.5, 0.5, 0.55, 1)
+        top_wall.setColor(0.5, 0.5, 0.55, 0.3)  # 30% opacity
+        top_wall.setTransparency(True)
         top_wall.reparentTo(self.render)
         
-        # Bottom wall
+        # Bottom wall (translucent)
         bottom_wall = self._create_box(self.grid_width/2, self.grid_height, self.grid_width, wall_thickness, wall_height)
-        bottom_wall.setColor(0.5, 0.5, 0.55, 1)
+        bottom_wall.setColor(0.5, 0.5, 0.55, 0.3)  # 30% opacity
+        bottom_wall.setTransparency(True)
         bottom_wall.reparentTo(self.render)
         
-        # Left wall
+        # Left wall (translucent)
         left_wall = self._create_box(0, self.grid_height/2, wall_thickness, self.grid_height, wall_height)
-        left_wall.setColor(0.5, 0.5, 0.55, 1)
+        left_wall.setColor(0.5, 0.5, 0.55, 0.3)  # 30% opacity
+        left_wall.setTransparency(True)
         left_wall.reparentTo(self.render)
         
-        # Right wall
+        # Right wall (translucent)
         right_wall = self._create_box(self.grid_width, self.grid_height/2, wall_thickness, self.grid_height, wall_height)
-        right_wall.setColor(0.5, 0.5, 0.55, 1)
+        right_wall.setColor(0.5, 0.5, 0.55, 0.3)  # 30% opacity
+        right_wall.setTransparency(True)
         right_wall.reparentTo(self.render)
         
-        # Create agent node pool
+        # Create agent node pool - use 3D model if available
         for i in range(self.max_agent_nodes):
-            agent_node = self._create_box(0, 0, 0.3, 0.3, 0.6, 0)
+            if self.agent_model_template is not None:
+                # Use 3D humanoid model
+                agent_node = self.agent_model_template.copyTo(self.render)
+            else:
+                # Fallback to procedural box
+                agent_node = self._create_box(0, 0, 0.3, 0.3, 0.6, 0)
+            
             agent_node.setColor(0.2, 0.5, 0.8, 0.9)
-            agent_node.reparentTo(self.render)
             agent_node.hide()
             self.agent_nodes.append(agent_node)
         
-        # Initialize gate nodes (will be updated in update_scene)
+        # Initialize gate nodes - use 3D door model if available
         for _ in range(self.env.NUM_GATES):
-            gate = self._create_box(0, 0, 1.0, 1.0, 0.3, 0)
+            if self.gate_model_template is not None:
+                # Use 3D door model
+                gate = self.gate_model_template.copyTo(self.render)
+            else:
+                # Fallback to procedural box
+                gate = self._create_box(0, 0, 1.0, 1.0, 0.3, 0)
+            
             gate.setColor(0.2, 0.8, 0.2, 0.8)
-            gate.reparentTo(self.render)
             self.gate_nodes.append(gate)
         
         # Initialize barrier nodes
@@ -346,19 +424,21 @@ class EnhancedCrowdRenderer(ShowBase):
             if i < len(self.agent_nodes):
                 node = self.agent_nodes[i]
                 node.show()
-                node.setPos(agent.x, agent.y, 0.3)
+                # Raise Z position to prevent feet clipping through floor
+                node.setPos(agent.x, agent.y, 0.8)
                 
                 # Color based on panic level (NOVEL: Panic visualization)
+                # Using more VIBRANT colors for better visibility
                 panic = agent.panic_level
                 if panic > 0.7:
-                    # Red = high panic
-                    node.setColor(1, 0, 0, 0.9)
+                    # BRIGHT RED = high panic (very vibrant)
+                    node.setColor(1.0, 0.0, 0.0, 1.0)
                 elif panic > 0.3:
-                    # Orange = moderate stress
-                    node.setColor(1, 0.5, 0, 0.9)
+                    # VIBRANT ORANGE = moderate stress (saturated)
+                    node.setColor(1.0, 0.4, 0.0, 1.0)
                 else:
-                    # Blue = calm
-                    node.setColor(0.2, 0.5, 0.8, 0.9)
+                    # BRIGHT CYAN-BLUE = calm (more saturated than before)
+                    node.setColor(0.0, 0.6, 1.0, 1.0)
         
         # Hide unused agent nodes
         for i in range(len(agents), len(self.agent_nodes)):

@@ -114,7 +114,7 @@ class CrowdControlDemo:
     # ========================================================================
     # NEW: RL Model Policy
     # ========================================================================
-    def run_model_policy(self, num_episodes=3, max_steps=None):
+    def run_model_policy(self, num_episodes=1, max_steps=None):
 
         if self.model is None:
             raise RuntimeError("No model loaded! Use --model-path <file>")
@@ -124,7 +124,7 @@ class CrowdControlDemo:
 
         for episode in range(num_episodes):
             self.episode_count += 1
-            obs, info = self.env.reset(seed=56)
+            obs, info = self.env.reset()
 
             episode_reward = 0
             step = 0
@@ -218,7 +218,7 @@ class CrowdControlDemo:
                 
                 # Small delay for visualization
                 if self.renderer is not None:
-                    time.sleep(0.01)
+                    time.sleep(0.05)
             
             # Episode summary
             self._print_episode_summary(step, episode_reward, info)
@@ -298,7 +298,7 @@ class CrowdControlDemo:
                     done = True
                 
                 if self.renderer is not None:
-                    time.sleep(0.01)
+                    time.sleep(0.05)
             
             self._print_episode_summary(step, episode_reward, info)
             
@@ -330,7 +330,7 @@ class CrowdControlDemo:
         
         # Termination reason
         if hasattr(self.env, '_terminal_reason'):
-            print(f"    Termination: {self.env._terminal_reason}")
+            print(f"    Termination: {self.env._terminal_reason if self.env._terminal_reason else 'Survived'}")
     
     def close(self):
         """Clean up resources"""
