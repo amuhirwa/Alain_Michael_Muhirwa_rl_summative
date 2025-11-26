@@ -124,7 +124,7 @@ class CrowdControlDemo:
 
         for episode in range(num_episodes):
             self.episode_count += 1
-            obs, info = self.env.reset()
+            obs, info = self.env.reset(seed=56)
 
             episode_reward = 0
             step = 0
@@ -218,7 +218,7 @@ class CrowdControlDemo:
                 
                 # Small delay for visualization
                 if self.renderer is not None:
-                    time.sleep(0.05)
+                    time.sleep(0.01)
             
             # Episode summary
             self._print_episode_summary(step, episode_reward, info)

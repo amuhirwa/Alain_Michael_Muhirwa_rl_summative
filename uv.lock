@@ -28,6 +28,7 @@ dependencies = [
     { name = "numpy" },
     { name = "opencv-python" },
     { name = "panda3d" },
+    { name = "panda3d-gltf" },
     { name = "pandas" },
     { name = "pillow" },
     { name = "scipy" },
@@ -47,6 +48,7 @@ requires-dist = [
     { name = "numpy", specifier = "==1.24.3" },
     { name = "opencv-python", specifier = "==4.8.1.78" },
     { name = "panda3d", specifier = "==1.10.14" },
+    { name = "panda3d-gltf", specifier = ">=1.3.0" },
     { name = "pandas", specifier = "==2.0.3" },
     { name = "pillow", specifier = "==10.1.0" },
     { name = "scipy", specifier = ">=1.15.3" },
@@ -990,6 +992,32 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/11/69/806dcdbaee3e8deee1956abeea0d3d3e504315d2e9814de82a44809a8617/panda3d-1.10.14-cp312-cp312-manylinux2014_x86_64.whl", hash = "sha256:3c4399a286a142de7ff86f9356d7e526bbbd38892d7f7d39fecb5c33064972bc", size = 55539594, upload-time = "2024-01-08T19:01:15.979Z" },
     { url = "https://files.pythonhosted.org/packages/ad/25/005de5e2b6d0acd546f8b3f2b547cd29e308cdd04a397f0ea68046e26571/panda3d-1.10.14-cp312-cp312-win32.whl", hash = "sha256:e92e0dd907e2af33085a2c31ca2263dc8023b1b7bc70ce1b9fbc84631e130e51", size = 53479813, upload-time = "2024-01-08T19:01:20.923Z" },
     { url = "https://files.pythonhosted.org/packages/74/bb/cb57563855da994614a33f57bd5691fbcd69f12e5ccddd30d387d0be287f/panda3d-1.10.14-cp312-cp312-win_amd64.whl", hash = "sha256:a5f2defd822d38848f8ae1956115adcb6cc7f464f03a67e73681cc72df125ef4", size = 64893222, upload-time = "2024-01-08T19:01:26.347Z" },
+]
+
+[[package]]
+name = "panda3d-gltf"
+version = "1.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "panda3d" },
+    { name = "panda3d-simplepbr" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6b/e9/36ea1b84bfbe4fafc60216fb8eb3f71ef3aa7156569f475621f8bb5eeb5e/panda3d_gltf-1.3.0.tar.gz", hash = "sha256:40ed155ca060f662e53c9bd5526fa91024dd308bc61ebe27218b20a5afb1d9ff", size = 29038, upload-time = "2025-03-16T05:57:25.315Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/0f/b9406c4434422822039a4daefdc479e71326131f2a0f80f88f7cfc60e9c8/panda3d_gltf-1.3.0-py3-none-any.whl", hash = "sha256:2512500ee7e2fc13431dc47e9510efff2c29b9dd82714bd2c36165be2c82ef97", size = 27758, upload-time = "2025-03-16T05:57:24.021Z" },
+]
+
+[[package]]
+name = "panda3d-simplepbr"
+version = "0.13.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "panda3d" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0d/be/c4d1ded04c22b357277cf6e6a44c1ab4abb285a700bd1991460460e05b99/panda3d_simplepbr-0.13.1.tar.gz", hash = "sha256:c83766d7c8f47499f365a07fe1dff078fc8b3054c2689bdc8dceabddfe7f1a35", size = 6216055, upload-time = "2025-03-30T16:57:41.087Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/11/5d/3744c6550dddf933785a37cdd4a9921fe13284e6d115b5a2637fe390f158/panda3d_simplepbr-0.13.1-py3-none-any.whl", hash = "sha256:cda41cb57cff035b851646956cfbdcc408bee42511dabd4f2d7bd4fbf48c57a9", size = 2457097, upload-time = "2025-03-30T16:57:39.729Z" },
 ]
 
 [[package]]
