@@ -1,133 +1,180 @@
-# Crowd Control Reinforcement Learning System
+# 🎯 Crowd Control Reinforcement Learning System
+
+<div align="center">
+
+**Intelligent Crowd Management and Safety Optimization using Deep Reinforcement Learning**
+
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Stable-Baselines3](https://img.shields.io/badge/SB3-2.2.1-green.svg)](https://stable-baselines3.readthedocs.io/)
+[![Panda3D](https://img.shields.io/badge/Panda3D-1.10.14-orange.svg)](https://www.panda3d.org/)
+[![Gymnasium](https://img.shields.io/badge/Gymnasium-0.29.1-red.svg)](https://gymnasium.farama.org/)
 
 **Author:** Alain Michael Muhirwa  
-**Course:** Reinforcement Learning Summative Assignment  
-**Mission:** Intelligent Crowd Management and Safety Optimization
+**Course:** Reinforcement Learning Summative Assignment
+
+</div>
 
 ---
 
-## 📋 Project Overview
+## 📋 Table of Contents
 
-This project implements a sophisticated **Crowd Control System** using Reinforcement Learning to manage crowd flow in venues, prevent overcrowding at gates/exits, and ensure public safety. The system trains and compares four different RL algorithms to find the optimal crowd management strategy.
-
-### 🎯 Mission Statement
-
-In crowded venues (stadiums, concerts, public events), dangerous overcrowding can occur at gates and exits, leading to safety hazards and potential stampedes. This RL system acts as an intelligent crowd control agent that:
-
-- **Monitors** real-time crowd density across a venue
-- **Controls** movable barriers to guide crowd flow
-- **Manages** gate operations to optimize throughput
-- **Prevents** dangerous overcrowding situations
-- **Ensures** safe and efficient crowd dispersal
+- [Project Overview](#-project-overview)
+- [Environment Details](#-environment-details)
+- [Implemented Algorithms](#-implemented-algorithms)
+- [Results & Performance](#-results--performance)
+- [3D Visualization](#-3d-visualization)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [Project Structure](#-project-structure)
+- [References](#-references)
 
 ---
 
-## 🏗️ System Architecture
+## 🌟 Project Overview
+
+This project implements a sophisticated **Crowd Control System** using Reinforcement Learning to manage crowd flow in venues, prevent overcrowding at gates/exits, and ensure public safety. The system trains and compares **four different RL algorithms** (DQN, PPO, A2C, REINFORCE) across **40+ hyperparameter configurations** to find the optimal crowd management strategy.
+
+### 🎯 Problem Statement
+
+In crowded venues (stadiums, concerts, public events), dangerous overcrowding can occur at gates and exits, leading to safety hazards and potential stampedes. This RL system acts as an intelligent crowd control manager that:
+
+- **Monitors** real-time crowd density across a 15×15 grid venue
+- **Controls** 4 movable barriers to redirect crowd flow
+- **Manages** 3 exit gates to optimize throughput
+- **Prevents** dangerous overcrowding (density > 3.5 people/cell)
+- **Mitigates** panic propagation through strategic interventions
+- **Ensures** safe and efficient crowd evacuation
+
+### 🏆 Key Results
+
+| Algorithm  | Best Config       | Mean Reward | Convergence  | Ranking |
+| ---------- | ----------------- | ----------- | ------------ | ------- |
+| **A2C** ⭐ | config_2_high_lr  | **1289.6**  | 39,000 steps | 🥇 1st  |
+| PPO        | config_2_high_lr  | 1010.4      | 65,536 steps | 🥈 2nd  |
+| REINFORCE  | config_1_baseline | 879.1       | ~48 episodes | 🥉 3rd  |
+| DQN        | config_1_baseline | 703.6       | 52,000 steps | 4th     |
+
+---
+
+## 🏗️ Environment Details
+
+### System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    CROWD CONTROL AGENT                       │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
-│  │    DQN     │  │    PPO     │  │    A2C     │            │
-│  │ (Value-    │  │ (Policy    │  │ (Actor-    │            │
-│  │  Based)    │  │ Gradient)  │  │  Critic)   │            │
-│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘            │
-│        └─────────────┬──┴───────────────┘                    │
-│                      │                                        │
-│            ┌─────────▼─────────┐                            │
-│            │   REINFORCE       │                            │
-│            │ (Monte Carlo PG)  │                            │
-│            └─────────┬─────────┘                            │
-└──────────────────────┼──────────────────────────────────────┘
-                       │
-        ┌──────────────▼──────────────┐
-        │  CROWD CONTROL ENVIRONMENT  │
-        │  ┌──────────────────────┐  │
-        │  │  • 20x20 Grid        │  │
-        │  │  • Crowd Dynamics    │  │
-        │  │  • Movable Barriers  │  │
-        │  │  • Gate Controls     │  │
-        │  │  • Safety Metrics    │  │
-        │  └──────────────────────┘  │
-        └─────────────┬───────────────┘
-                      │
-        ┌─────────────▼───────────────┐
-        │   PANDA3D VISUALIZATION     │
-        │   • Real-time 3D Graphics   │
-        │   • Heat Map Density View   │
-        │   • Agent Performance HUD   │
-        └─────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    CROWD CONTROL AGENT                          │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌───────────┐ │
+│  │    DQN     │  │    PPO     │  │    A2C     │  │ REINFORCE │ │
+│  │  (Value)   │  │  (Policy)  │  │  (Actor-   │  │ (Monte    │ │
+│  │            │  │  Gradient) │  │   Critic)  │  │  Carlo)   │ │
+│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  └─────┬─────┘ │
+│        └───────────────┴───────────────┴───────────────┘        │
+│                                │                                 │
+│                    ┌───────────▼───────────┐                    │
+│                    │   ACTION SELECTION    │                    │
+│                    │   (25 Discrete)       │                    │
+│                    └───────────┬───────────┘                    │
+└────────────────────────────────┼────────────────────────────────┘
+                                 │
+           ┌─────────────────────▼─────────────────────┐
+           │      CROWD CONTROL ENVIRONMENT            │
+           │  ┌─────────────────────────────────────┐  │
+           │  │  • 15×15 Grid (225 cells)           │  │
+           │  │  • Social Force Model Physics       │  │
+           │  │  • JIT-Accelerated (Numba)          │  │
+           │  │  • Panic Propagation Dynamics       │  │
+           │  │  • 4 Movable Barriers               │  │
+           │  │  • 3 Controllable Gates             │  │
+           │  │  • 5 Spawn Entrances                │  │
+           │  │  • 80-160 Max Agents (difficulty)   │  │
+           │  └─────────────────────────────────────┘  │
+           └─────────────────────┬─────────────────────┘
+                                 │
+           ┌─────────────────────▼─────────────────────┐
+           │        PANDA3D 3D VISUALIZATION           │
+           │  • Real-time Humanoid Agent Rendering     │
+           │  • Panic-based Color Coding               │
+           │  • Density Heat Maps                      │
+           │  • Interactive Camera Controls            │
+           │  • Performance HUD Overlay                │
+           └───────────────────────────────────────────┘
 ```
 
----
+### Observation Space (918 dimensions)
 
-## 🌟 Environment Details
+The agent observes a normalized feature vector containing:
 
-### State Space (Observation)
+| Component         | Dimensions  | Description                                          |
+| ----------------- | ----------- | ---------------------------------------------------- |
+| Grid Density      | 15×15 = 225 | Crowd count per cell, normalized by MAX_CROWD (10.0) |
+| Panic Grid        | 15×15 = 225 | Panic level per cell, range [0, 1]                   |
+| Velocity X        | 15×15 = 225 | Crowd movement X-vectors, normalized                 |
+| Velocity Y        | 15×15 = 225 | Crowd movement Y-vectors, normalized                 |
+| Gate States       | 3×2 = 6     | Position (x, y) and open/closed status               |
+| Barrier Positions | 4×3 = 12    | Position (x, y) and cooldown status                  |
+| Global Statistics | 3           | Avg density, timestep ratio, agents ratio            |
 
-The agent observes:
+**Total:** 918 features (normalized to [0, 1])
 
-1. **Grid Density** (20×20): Crowd density at each cell (0-10 people/cell)
-2. **Velocity Fields** (20×20×2): Crowd movement vectors (x, y directions)
-3. **Gate States** (3): Open/closed status of each exit gate
-4. **Barrier Positions** (4×2): Current locations of movable barriers
-5. **Timestep**: Current simulation time
+### Action Space (25 Discrete Actions)
 
-**Total Observation Dimension:** 1,209 features (normalized to [0, 1])
-
-### Action Space
-
-The agent can perform **12 discrete actions**:
-
-| Action ID | Description         | Effect                                    |
-| --------- | ------------------- | ----------------------------------------- |
-| 0-3       | Move Barrier 1-4    | Relocate crowd control barriers           |
-| 4-6       | Toggle Gates 1-3    | Open/close exit gates                     |
-| 7-10      | Set Flow Directions | Guide crowd movement (up/down/left/right) |
-| 11        | Emergency Response  | Open all gates, increase capacity         |
+| Action ID | Category           | Description                                    |
+| --------- | ------------------ | ---------------------------------------------- |
+| 0-15      | Barrier Movement   | 4 barriers × 4 directions (up/down/left/right) |
+| 16-18     | Gate Toggle        | Open/close 3 exit gates independently          |
+| 19-22     | Flow Direction     | Nudge crowd flow (up/down/left/right)          |
+| 23        | Emergency Response | Open all gates simultaneously                  |
+| 24        | No-op              | Maintain current configuration                 |
 
 ### Reward Structure
 
-The reward function encourages safe and efficient crowd management:
+The reward function balances multiple objectives with the following components:
 
-```python
-reward = density_reward + safety_reward + efficiency_reward - action_costs
-
-Where:
-  • density_reward: Penalty for high crowd density (overcrowding)
-  • safety_reward: Large penalty for dangerous conditions (density > 8.0)
-  • efficiency_reward: Reward for reducing total crowd size
-  • action_costs: Small penalties for unnecessary actions
+```
+Total Reward = Density_Reward × 2.0
+             + Efficiency_Reward × 2.5
+             + Safety_Reward × 0.5
+             - Infrastructure_Cost
+             + Survival_Bonus
+             + Milestone_Bonuses
+             + Success_Reward (terminal)
 ```
 
-**Special Rewards:**
+| Component              | Description                                                       | Range              |
+| ---------------------- | ----------------------------------------------------------------- | ------------------ |
+| **Throughput**         | +2.0 per person exiting + flow efficiency bonus                   | +0.5 to +2.5       |
+| **Density Management** | Reward for staying below target (1.5), penalties for overcrowding | -5.0 to +5.0       |
+| **Panic Regulation**   | Penalty for high panic, bonus for calm crowds                     | -0.2 to +0.05      |
+| **Survival Bonus**     | +5.0 per safe timestep (encourages longevity)                     | +5.0/step          |
+| **Milestone Bonuses**  | Rewards at steps 100/200/300/400                                  | +50/+100/+150/+200 |
+| **Success Reward**     | Large terminal reward for successful evacuation                   | +400 to +1000      |
+| **Failure Penalty**    | Critical density exceeded (>3.5)                                  | -10 to -20         |
 
-- ✅ **+100** for successful crowd dispersal (total crowd < 10)
-- ❌ **-50** for critical overcrowding event (density > 8.0)
+### Environment Parameters
 
-### Terminal Conditions
+| Parameter             | Value    | Description                      |
+| --------------------- | -------- | -------------------------------- |
+| Grid Size             | 15×15    | Venue dimensions                 |
+| Max Steps             | 500      | Episode timeout                  |
+| Critical Density      | 3.5      | Dangerous overcrowding threshold |
+| Target Density        | 1.5      | Optimal comfort zone             |
+| Panic Trigger         | 2.0      | Density that triggers panic      |
+| Gate Transition Delay | 10 steps | Cooldown for gate operations     |
+| Barrier Move Cost     | 5 steps  | Cooldown for barrier movement    |
 
-An episode ends when:
+### Difficulty Levels
 
-1. ✅ **Success**: Crowd successfully dispersed (< 10 people remaining)
-2. ❌ **Failure**: Critical overcrowding occurred (density > 8.0)
-3. ⏱️ **Timeout**: Maximum 500 timesteps reached
+| Difficulty | Max Agents | Rush Peak Time | Description                       |
+| ---------- | ---------- | -------------- | --------------------------------- |
+| Easy       | 80         | 0.4            | Manageable crowd, gradual arrival |
+| Medium     | 120        | 0.3            | Moderate challenge, faster peak   |
+| Hard       | 160        | 0.25           | Dense crowds, rapid influx        |
 
-### Environment Dynamics
+### Crowd Arrival Patterns
 
-**Crowd Behavior:**
-
-- Crowds enter from 5 entrance points
-- Naturally move toward nearest open gate
-- Movement influenced by velocity fields
-- Barriers block/redirect crowd flow
-- Exit through open gates (capacity-limited)
-
-**Safety Metrics:**
-
-- **Target Density:** 3.0 people/cell (optimal)
-- **Critical Density:** 8.0 people/cell (dangerous)
-- **Maximum Capacity:** 10.0 people/cell
+- **Rush**: Gaussian peak at rush_peak_time (concerts, events)
+- **Steady**: Constant flow until 80% of episode
+- **Evacuation**: Massive initial spawn with high panic
 
 ---
 
@@ -135,107 +182,325 @@ An episode ends when:
 
 ### 1. DQN (Deep Q-Network) - Value-Based
 
-**Approach:** Learns optimal Q-values for state-action pairs
+**Architecture:** 3-layer fully connected network [256, 256] with Dueling DQN architecture
 
-**Key Hyperparameters Tuned:**
+**Key Features:**
 
-- Learning rate: [1e-4, 5e-4, 1e-3]
-- Buffer size: [30k, 50k, 100k]
-- Batch size: [32, 64, 128]
-- Gamma: [0.98, 0.99, 0.995]
-- Target update interval: [500, 1000, 2000]
-- Exploration: epsilon-greedy decay
+- Experience Replay (50k-100k buffer)
+- Target Network (soft updates every 1000 steps)
+- ε-greedy exploration (1.0 → 0.2-0.25 over 80% training)
 
-**Training:** 100,000 timesteps × 12 configurations = 1.2M total timesteps
+**Best Configuration (config_1_baseline):**
 
-### 2. PPO (Proximal Policy Optimization) - Policy Gradient
+```python
+learning_rate = 1e-4
+buffer_size = 50000
+batch_size = 32
+gamma = 0.99
+exploration_fraction = 0.8
+exploration_final_eps = 0.2
+```
 
-**Approach:** Optimizes policy while constraining update magnitude
-
-**Key Hyperparameters Tuned:**
-
-- Learning rate: [1e-4, 3e-4, 1e-3]
-- N-steps: [1024, 2048, 4096]
-- Batch size: [32, 64, 128]
-- N-epochs: [5, 10, 20]
-- GAE lambda: [0.90, 0.95, 0.98]
-- Clip range: [0.15, 0.2, 0.3]
-- Entropy coefficient: [0.005, 0.01, 0.05]
-
-**Training:** 200,000 timesteps × 12 configurations = 2.4M total timesteps
-
-### 3. A2C (Advantage Actor-Critic) - Policy Gradient
-
-**Approach:** Combines policy and value function learning
-
-**Key Hyperparameters Tuned:**
-
-- Learning rate: [3e-4, 7e-4, 2e-3]
-- N-steps: [3, 5, 10, 20]
-- GAE lambda: [0.90, 0.95, 1.0]
-- Value coefficient: [0.4, 0.5, 0.8]
-- Entropy coefficient: [0.005, 0.01, 0.05]
-
-**Training:** 150,000 timesteps × 12 configurations = 1.8M total timesteps
-
-### 4. REINFORCE - Monte Carlo Policy Gradient
-
-**Approach:** Pure policy gradient with Monte Carlo returns
-
-**Key Hyperparameters Tuned:**
-
-- Learning rate: [1e-4, 1e-3, 5e-3]
-- Gamma: [0.98, 0.99, 0.995]
-- Baseline: [with/without value function]
-- Network architecture: [[128,128], [256,256], [128,128,128]]
-- Entropy coefficient: [0.005, 0.01, 0.05]
-
-**Training:** 1,000 episodes × 12 configurations = 12,000 total episodes
+**Result:** 703.6 mean reward
 
 ---
 
-## 🎨 3D Visualization (Panda3D)
+### 2. PPO (Proximal Policy Optimization) - Policy Gradient
 
-The system features **high-quality 3D visualization** using Panda3D:
+**Architecture:** Shared feature extractor [256, 256] with separate policy/value heads
 
-### Visual Elements
+**Key Features:**
 
-1. **3D Grid Environment**
+- Clipped Surrogate Objective (trust region: 0.2-0.3)
+- Generalized Advantage Estimation (GAE λ=0.95)
+- Mini-batch updates (10 epochs × 64 batch)
 
-   - Checkered floor pattern
-   - Boundary walls
-   - Realistic lighting (ambient, directional, point lights)
+**Best Configuration (config_2_high_lr):**
 
-2. **Crowd Visualization**
+```python
+learning_rate = 1e-3      # Aggressive - enabled by dense rewards
+n_steps = 2048
+batch_size = 64
+n_epochs = 10
+gae_lambda = 0.95
+clip_range = 0.2
+ent_coef = 0.01
+```
 
-   - Heat map cylinders showing density
-   - Color-coded by danger level:
-     - 🔵 Blue: Safe (density < 3.0)
-     - 🟠 Orange: Moderate (3.0 < density < 6.4)
-     - 🔴 Red: Dangerous (density > 6.4)
-   - Height scaled by crowd size
+**Result:** 1010.4 mean reward
 
-3. **Barriers & Gates**
+---
 
-   - Orange movable barriers (can be repositioned)
-   - Gates with pillars and top bars
-   - Color-coded status:
-     - 🟢 Green: Open
-     - 🔴 Red: Closed
+### 3. A2C (Advantage Actor-Critic) - Policy Gradient ⭐ BEST
 
-4. **Real-Time HUD**
+**Architecture:** Shared backbone [256, 256] with synchronous updates (4 parallel envs)
+
+**Key Features:**
+
+- Synchronous updates with 5-step TD returns
+- RMSprop optimizer for adaptive learning rates
+- Fast policy updates for dense reward exploitation
+
+**Best Configuration (config_2_high_lr) - CHAMPION:**
+
+```python
+learning_rate = 1e-3      # High LR - A2C handles aggressive gradients
+n_steps = 5               # Very short rollouts - immediate feedback
+gamma = 0.99
+gae_lambda = 1.0          # Full Monte Carlo advantage
+vf_coef = 0.5
+ent_coef = 0.01           # Minimal entropy - exploitation focused
+```
+
+**Result:** 1289.6 mean reward (HIGHEST)
+
+**Why A2C Won:**
+
+- Short rollouts (5 steps) enabled rapid policy iteration
+- Dense reward signal exploited effectively with high learning rate
+- Synchronous updates produced stable gradient flows
+
+---
+
+### 4. REINFORCE - Monte Carlo Policy Gradient
+
+**Architecture:** Custom 2-layer policy network [128, 128] with optional baseline
+
+**Key Features:**
+
+- Monte Carlo returns (full episode rollouts)
+- Baseline variance reduction (value network)
+- Entropy regularization (0.01-0.1)
+
+**Best Configuration (config_1_baseline):**
+
+```python
+learning_rate = 1e-3
+gamma = 0.99
+entropy_coef = 0.01
+use_baseline = True
+hidden_dims = [128, 128]
+```
+
+**Result:** 879.1 mean reward
+
+---
+
+## 📊 Results & Performance
+
+### Training Comparison
+
+| Metric              | DQN           | PPO      | A2C         | REINFORCE           |
+| ------------------- | ------------- | -------- | ----------- | ------------------- |
+| Best Mean Reward    | 703.6         | 1010.4   | **1289.6**  | 879.1               |
+| Convergence (steps) | 52,000        | 65,536   | **39,000**  | ~48 episodes        |
+| Training Stability  | Moderate      | High     | **Highest** | Low (high variance) |
+| Sample Efficiency   | Good (replay) | Moderate | Good        | Low                 |
+
+### Hyperparameter Configurations Tested
+
+Each algorithm was trained with **10 configurations** for comprehensive tuning:
+
+- **DQN:** Learning rates, buffer sizes, exploration strategies, batch sizes
+- **PPO:** N-steps, clip ranges, entropy coefficients, GAE lambda
+- **A2C:** N-steps, entropy coefficients, value function weights
+- **REINFORCE:** Baselines, network architectures, entropy regularization
+
+**Total Training Runs:** 40+ configurations
+
+### Key Findings
+
+1. **On-Policy Methods Dominate:** A2C and PPO outperformed DQN due to dense reward signals benefiting immediate policy updates
+
+2. **High Learning Rates Work:** 1e-3 learning rate succeeded for both A2C and PPO, contradicting typical conservative RL tuning
+
+3. **Short Rollouts Win:** A2C's 5-step rollouts enabled fastest convergence (39,000 steps)
+
+4. **Exploration Matters:** DQN with extended exploration (ε=0.2 final) outperformed aggressive decay
+
+5. **Generalization Gap:** All algorithms struggled with evacuation scenarios (panic-dominated), indicating training distribution mismatch
+
+### Generalization Performance
+
+Models tested on unseen scenarios (3 patterns × 3 difficulties):
+
+| Pattern    | Easy          | Medium        | Hard          |
+| ---------- | ------------- | ------------- | ------------- |
+| Rush       | A2C: 2739.4   | A2C: 703.7    | PPO: 100.4    |
+| Steady     | DQN: 2000+    | All: ~600     | All: <100     |
+| Evacuation | All: Negative | All: Negative | All: Negative |
+
+---
+
+## 🎨 3D Visualization
+
+### Panda3D Rendering Features
+
+The system features **high-quality 3D visualization** using Panda3D with GLTF humanoid models:
+
+#### Visual Elements
+
+1. **Crowd Agents (Humanoid 3D Models)**
+
+   - 🔵 **Blue:** Calm agents (panic < 0.3)
+   - 🟡 **Yellow:** Stressed agents (0.3 ≤ panic < 0.7)
+   - 🔴 **Red:** Panicking agents (panic ≥ 0.7)
+
+2. **Infrastructure**
+
+   - 🟨 **Yellow Blocks:** Movable barriers
+   - 🟩 **Green Squares:** Open gates
+   - 🟥 **Red Squares:** Closed gates
+   - ⬜ **Translucent Gray:** Venue walls
+
+3. **Environment**
+
+   - 15×15 grid floor
+   - Ambient + directional + point lighting
+   - Real-time density heat map overlay
+
+4. **HUD Display**
    - Current timestep
-   - Total crowd size
+   - Agent count (alive/exited/total)
    - Maximum density
-   - Open gates count
-   - Safety status indicator
+   - Panic levels
+   - Gate status
+   - Cumulative reward
 
-### Interactive Controls
+#### Interactive Controls
 
-- **[H]** - Toggle heat map visualization
-- **[R]** - Toggle camera auto-rotation
-- **[Arrow Keys]** - Manual camera movement
-- **[ESC]** - Exit simulation
+| Key                  | Action                        |
+| -------------------- | ----------------------------- |
+| `H`                  | Toggle heat map visualization |
+| `R`                  | Toggle camera auto-rotation   |
+| `Arrow Keys`         | Move camera horizontally      |
+| `Q/E` or `PgUp/PgDn` | Move camera vertically        |
+| `ESC`                | Exit simulation               |
+
+---
+
+## 🚀 Installation
+
+### Prerequisites
+
+- Python 3.11+
+- Windows/Linux/Mac
+- (Optional) CUDA-capable GPU for faster training
+
+### Quick Start with uv (Recommended)
+
+```bash
+# Clone repository
+git clone https://github.com/amuhirwa/Alain_Michael_Muhirwa_rl_summative.git
+cd Alain_Michael_Muhirwa_rl_summative
+
+# Install with uv (fastest)
+uv sync
+
+# Verify installation
+uv run python -c "import gymnasium; import panda3d; print('✅ Setup successful!')"
+```
+
+### Alternative: pip installation
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate (Windows PowerShell)
+.\venv\Scripts\Activate.ps1
+
+# Activate (Linux/Mac)
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Dependencies
+
+```
+gymnasium==0.29.1
+stable-baselines3==2.2.1
+torch==2.1.0
+numpy==1.24.3
+pandas==2.0.3
+matplotlib==3.7.2
+seaborn==0.12.2
+panda3d==1.10.14
+tensorboard==2.15.1
+numba  # JIT acceleration
+```
+
+---
+
+## 💻 Usage
+
+### 1. Run Best Trained Model (A2C Champion)
+
+```bash
+# Run with 3D visualization
+uv run python main.py --model models/a2c/config_2_high_lr/best_model.zip --episodes 3
+
+# Run for longer episodes
+uv run python main.py --model models/a2c/config_2_high_lr/best_model.zip --episodes 1 --max-steps 300
+```
+
+### 2. Run with Different Algorithms
+
+```bash
+# PPO model
+uv run python main.py --model models/ppo/config_2_high_lr/best_model.zip --episodes 3
+
+# DQN model
+uv run python main.py --model models/dqn/config_1_baseline/best_model.zip --episodes 3
+
+# Curriculum-trained PPO
+uv run python main.py --model models/curriculum_ppo/PPO_curriculum_medium.zip --episodes 3
+```
+
+### 3. Run Random/Heuristic Policy (Demo)
+
+```bash
+# Random policy (baseline)
+uv run python main.py --policy random --episodes 3
+
+# Heuristic policy (rule-based)
+uv run python main.py --policy heuristic --episodes 3
+```
+
+### 4. Train Algorithms
+
+```bash
+# Train A2C (all 10 configurations)
+uv run python training/a2c_training.py
+
+# Train PPO
+uv run python training/ppo_training.py
+
+# Train DQN
+uv run python training/dqn_training.py
+
+# Train REINFORCE
+uv run python training/reinforce_training.py
+
+# Curriculum Learning (progressive difficulty)
+uv run python training/curriculum_training.py
+```
+
+### 5. Compare Algorithms
+
+```bash
+# Generate comparison plots
+uv run python compare_algorithms.py
+```
+
+### 6. Monitor Training (TensorBoard)
+
+```bash
+tensorboard --logdir logs/
+# Open browser to http://localhost:6006
+```
 
 ---
 
@@ -244,236 +509,79 @@ The system features **high-quality 3D visualization** using Panda3D:
 ```
 Alain_Michael_Muhirwa_rl_summative/
 │
-├── environment/
+├── 📂 environment/
 │   ├── __init__.py
-│   ├── custom_env.py          # Gymnasium environment implementation
-│   └── rendering.py            # Panda3D 3D visualization
+│   ├── enhanced_env_fast.py      # JIT-accelerated Gymnasium environment
+│   └── enhanced_rendering.py     # Panda3D 3D visualization
 │
-├── training/
-│   ├── dqn_training.py         # DQN with 12 hyperparameter configs
-│   ├── ppo_training.py         # PPO with 12 hyperparameter configs
-│   ├── a2c_training.py         # A2C with 12 hyperparameter configs
-│   └── reinforce_training.py   # REINFORCE with 12 configs
+├── 📂 training/
+│   ├── dqn_training.py           # DQN with 10 hyperparameter configs
+│   ├── ppo_training.py           # PPO with 10 hyperparameter configs
+│   ├── a2c_training.py           # A2C with 10 hyperparameter configs (⭐ best)
+│   ├── reinforce_training.py     # Custom REINFORCE implementation
+│   ├── curriculum_training.py    # Progressive difficulty training
+│   └── vectorized_training.py    # Multi-env parallel training
 │
-├── models/                     # Saved trained models
-│   ├── dqn/
-│   │   ├── config_1_baseline/
-│   │   │   ├── best_model.zip
-│   │   │   └── results.json
-│   │   ├── config_2_high_lr/
+├── 📂 evaluation/
+│   ├── analyze_actions.py        # Action distribution analysis
+│   ├── generate_report_plots.py  # Publication-quality figures
+│   └── scenario_evaluation.py    # Multi-scenario generalization testing
+│
+├── 📂 models/                    # Saved trained models
+│   ├── a2c/
+│   │   ├── config_2_high_lr/     # ⭐ BEST MODEL (1289.6 reward)
 │   │   └── ...
 │   ├── ppo/
-│   ├── a2c/
-│   └── reinforce/
-│
-├── logs/                       # TensorBoard logs
 │   ├── dqn/
-│   ├── ppo/
+│   ├── reinforce/
+│   └── curriculum_ppo/
+│
+├── 📂 logs/                      # TensorBoard training logs
 │   ├── a2c/
+│   ├── ppo/
+│   ├── dqn/
 │   └── reinforce/
 │
-├── demo_random_agent.py        # Random agent visualization demo
-├── main.py                     # Entry point for running trained models
-├── requirements.txt            # Project dependencies
-└── README.md                   # This file
+├── 📂 results/                   # Evaluation outputs
+│   ├── 1_cumulative_rewards.png
+│   ├── 2_training_stability.png
+│   ├── 3_convergence.png
+│   ├── 4_generalization.png
+│   ├── 5_performance_summary.png
+│   ├── 6_hyperparameter_analysis.png
+│   └── FINAL_REPORT.md
+│
+├── 📂 3d_models/                 # GLTF humanoid models
+│   ├── humanoid/
+│   ├── humanoid2/
+│   └── humanoid3/
+│
+├── main.py                       # Entry point for running models
+├── compare_algorithms.py         # Algorithm comparison utility
+├── requirements.txt              # Python dependencies
+├── pyproject.toml               # uv project configuration
+└── README.md                    # This file
 ```
 
 ---
 
-## 🚀 Installation & Setup
+## 📈 Visualizations Generated
 
-### Prerequisites
+The project generates comprehensive analysis plots in `results/`:
 
-- Python 3.8+
-- Windows/Linux/Mac
-- (Optional) CUDA-capable GPU for faster training
-
-### Installation Steps
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/yourusername/Alain_Michael_Muhirwa_rl_summative.git
-   cd Alain_Michael_Muhirwa_rl_summative
-   ```
-
-2. **Create virtual environment:**
-
-   ```powershell
-   # Windows PowerShell
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
-   ```
-
-3. **Install dependencies:**
-
-   ```powershell
-   pip install -r requirements.txt
-   ```
-
-4. **Verify installation:**
-   ```powershell
-   python -c "import gymnasium; import panda3d; print('Setup successful!')"
-   ```
+1. **Cumulative Rewards** - Training curves for all algorithms
+2. **Training Stability** - Variance and consistency analysis
+3. **Convergence Analysis** - Episodes to reach 90% peak performance
+4. **Generalization Performance** - Multi-scenario testing results
+5. **Performance Summary** - Algorithm comparison bar charts
+6. **Hyperparameter Analysis** - Impact of tuning choices
 
 ---
 
-## 💻 Usage
+## 🎥 Video Demonstrations
 
-### 1. Demo: Random Agent (No Training)
-
-See the environment visualization with a random agent:
-
-```powershell
-python demo_random_agent.py
-```
-
-This demonstrates the 3D GUI without any trained model.
-
-### 2. Train Individual Algorithm
-
-Train a specific algorithm with one configuration:
-
-```powershell
-# Train DQN with configuration 0
-python training/dqn_training.py --config 0 --timesteps 100000
-
-# Train PPO with configuration 3
-python training/ppo_training.py --config 3 --timesteps 200000
-
-# Train A2C with configuration 5
-python training/a2c_training.py --config 5 --timesteps 150000
-
-# Train REINFORCE with configuration 8
-python training/reinforce_training.py --config 8 --episodes 1000
-```
-
-### 3. Train All Configurations (Full Hyperparameter Tuning)
-
-```powershell
-# Train all DQN configurations
-python training/dqn_training.py --timesteps 100000
-
-# Train all PPO configurations
-python training/ppo_training.py --timesteps 200000
-
-# Train all A2C configurations
-python training/a2c_training.py --timesteps 150000
-
-# Train all REINFORCE configurations
-python training/reinforce_training.py --episodes 1000
-```
-
-### 4. Run Best Trained Model
-
-```powershell
-# Run best DQN model with visualization
-python main.py --algorithm dqn --best --episodes 5
-
-# Run specific configuration
-python main.py --algorithm ppo --config config_1_baseline --episodes 3
-
-# Run custom model path
-python main.py --algorithm a2c --model models/a2c/config_8_aggressive/best_model --episodes 5
-```
-
-### 5. Compare All Algorithms
-
-```powershell
-python main.py --compare
-```
-
-This evaluates all algorithms and displays a comparison table.
-
----
-
-## 📊 Results & Analysis
-
-### Training Performance
-
-After extensive hyperparameter tuning (48 total configurations), the results are:
-
-| Algorithm | Best Config           | Mean Reward | Success Rate | Training Time |
-| --------- | --------------------- | ----------- | ------------ | ------------- |
-| PPO       | config_8_balanced     | **TBD**     | **TBD**      | ~X hours      |
-| DQN       | config_3_large_buffer | **TBD**     | **TBD**      | ~X hours      |
-| A2C       | config_7_balanced     | **TBD**     | **TBD**      | ~X hours      |
-| REINFORCE | config_1_baseline     | **TBD**     | **TBD**      | ~X hours      |
-
-_(Fill in after training)_
-
-### Key Findings
-
-**Expected Observations:**
-
-1. **PPO** likely performs best due to:
-
-   - Stable policy updates (clipped objective)
-   - Efficient sample usage (multiple epochs)
-   - Good exploration-exploitation balance
-
-2. **DQN** may struggle due to:
-
-   - Large discrete action space
-   - Delayed reward signals
-   - Need for extensive exploration
-
-3. **A2C** expected to be:
-
-   - Fast to train (low n-steps)
-   - Potentially unstable (on-policy, no replay buffer)
-   - Good for real-time applications
-
-4. **REINFORCE** likely to show:
-   - High variance in learning
-   - Benefit from baseline (variance reduction)
-   - Slower convergence than actor-critic methods
-
-### Hyperparameter Impact
-
-**Most Important Hyperparameters:**
-
-1. **Learning Rate**: Higher LR (1e-3) speeds up early learning but may destabilize
-2. **Entropy Coefficient**: Higher entropy (0.05) improves exploration
-3. **GAE Lambda**: Higher lambda (0.98) better for long-term planning
-4. **Network Size**: Larger networks ([256, 256]) improve capacity but slower
-
----
-
-## 🎥 Video Demonstration Requirements
-
-For the assignment video submission, the code includes verbose output showing:
-
-1. **Problem Statement**: Crowd control and safety optimization
-2. **Agent Behavior**: Real-time decision making visible in GUI
-3. **Reward Structure**: Console shows rewards for each action
-4. **Agent Objective**: Prevent overcrowding, ensure safe dispersal
-5. **GUI Visualization**: 3D Panda3D rendering with heat maps
-6. **Terminal Output**: Metrics (crowd size, density, rewards) displayed
-7. **Performance Analysis**: Success rate, episode length, safety metrics
-
----
-
-## 📈 Monitoring Training
-
-### TensorBoard
-
-View training progress in real-time:
-
-```powershell
-tensorboard --logdir logs/
-```
-
-Then open browser to `http://localhost:6006`
-
-**Metrics Tracked:**
-
-- Episode reward (mean, min, max)
-- Episode length
-- Success rate
-- Value function estimates
-- Policy entropy
-- Loss values
+- **[Full Demo Video](https://youtu.be/FdA0BtxUWVQ)** - Complete walkthrough with trained agent
+- **[Environment Visualization](https://youtu.be/5l7eS45pNRw)** - 3D rendering showcase
 
 ---
 
@@ -481,108 +589,63 @@ Then open browser to `http://localhost:6006`
 
 ### Common Issues
 
-**1. Panda3D display issues:**
+**1. Model not found:**
 
-```powershell
-# If graphics don't display, check Panda3D config
-python -c "from direct.showbase.ShowBase import ShowBase; ShowBase()"
+```bash
+# Check available models
+ls models/a2c/config_2_high_lr/
 ```
 
-**2. CUDA out of memory:**
+**2. Panda3D display issues:**
+
+```bash
+# Test Panda3D installation
+python -c "from direct.showbase.ShowBase import ShowBase; print('OK')"
+```
+
+**3. CUDA out of memory:**
 
 ```python
-# Reduce batch size or use CPU
-device='cpu'  # in training scripts
+# Use CPU instead (in training scripts)
+device = 'cpu'
 ```
 
-**3. Import errors:**
+**4. Numba compilation slow on first run:**
 
-```powershell
-# Ensure virtual environment is activated
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
----
-
-## 📝 Report Template
-
-For the PDF report submission, include:
-
-### 1. Environment Description
-
-- State space diagram
-- Action space table
-- Reward function equation
-- Terminal conditions
-
-### 2. Algorithm Implementations
-
-- Brief theory for each algorithm
-- Hyperparameter tables
-- Training configuration details
-
-### 3. Results & Comparison
-
-- Performance graphs (all in `models/*/hyperparameter_comparison.png`)
-- Comparison tables
-- Best configuration analysis
-
-### 4. Hyperparameter Analysis
-
-- Learning curves
-- Impact of each hyperparameter
-- Convergence analysis
-
-### 5. Conclusion
-
-- Best performing algorithm
-- Lessons learned
-- Future improvements
-
----
-
-## 🎓 Academic Integrity
-
-This project was developed as part of a Reinforcement Learning course summative assignment. All code is original implementation following course requirements.
-
-**Key Features:**
-
-- ✅ Custom non-generic environment (crowd control)
-- ✅ Comprehensive action/observation spaces
-- ✅ Realistic reward structure
-- ✅ Advanced visualization (Panda3D)
-- ✅ 4 RL algorithms implemented
-- ✅ Extensive hyperparameter tuning (48 configs)
-- ✅ Full documentation and analysis
+- This is normal - JIT compilation happens once, subsequent runs are fast
 
 ---
 
 ## 📚 References
 
-1. Stable-Baselines3 Documentation: https://stable-baselines3.readthedocs.io/
-2. Gymnasium Documentation: https://gymnasium.farama.org/
-3. Panda3D Documentation: https://docs.panda3d.org/
-4. Sutton & Barto: "Reinforcement Learning: An Introduction"
-5. Schulman et al.: "Proximal Policy Optimization Algorithms"
-6. Mnih et al.: "Human-level control through deep reinforcement learning"
+1. **Stable-Baselines3:** https://stable-baselines3.readthedocs.io/
+2. **Gymnasium:** https://gymnasium.farama.org/
+3. **Panda3D:** https://docs.panda3d.org/
+4. **Sutton & Barto:** "Reinforcement Learning: An Introduction" (2018)
+5. **Schulman et al.:** "Proximal Policy Optimization Algorithms" (2017)
+6. **Mnih et al.:** "Human-level control through deep reinforcement learning" (2015)
+7. **Helbing & Molnár:** "Social Force Model for Pedestrian Dynamics" (1995)
 
 ---
 
 ## 📧 Contact
 
 **Student:** Alain Michael Muhirwa  
-**Email:** [Your Email]  
-**GitHub:** [Your GitHub]  
-**Course:** Reinforcement Learning Summative
+**GitHub:** [@amuhirwa](https://github.com/amuhirwa)  
+**Repository:** [Alain_Michael_Muhirwa_rl_summative](https://github.com/amuhirwa/Alain_Michael_Muhirwa_rl_summative)
 
 ---
 
 ## 📄 License
 
-This project is submitted for academic evaluation. Please respect academic integrity policies.
+This project was developed for academic evaluation as part of a Reinforcement Learning course.
 
 ---
 
-**Last Updated:** November 18, 2025  
-**Version:** 1.0.0
+<div align="center">
+
+**⭐ If you found this project helpful, please consider giving it a star! ⭐**
+
+_Last Updated: December 2025 | Version 1.0.0_
+
+</div>
