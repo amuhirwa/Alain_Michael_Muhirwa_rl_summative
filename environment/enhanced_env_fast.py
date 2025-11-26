@@ -313,7 +313,7 @@ class EnhancedCrowdControlEnvFast(gym.Env):
         self.y[i] = y0
         self.vx[i] = 0
         self.vy[i] = 0
-        self.goal[i] = np.random.randint(0, self.NUM_GATES)
+        self.goal[i] = self.np_random.integers(0, self.NUM_GATES)
         self.panic[i] = init_panic
         self.alive[i] = True
         self.num_agents += 1
@@ -331,11 +331,11 @@ class EnhancedCrowdControlEnvFast(gym.Env):
             agents_per_entrance = (7, 10)  # 35-50 total agents
             
         for ex, ey in self.entrances:
-            n = np.random.randint(*agents_per_entrance)
+            n = self.np_random.integers(*agents_per_entrance)
             for _ in range(n):
                 self._spawn_agent(
-                    ex + np.random.uniform(-2.0, 2.0),  # Wider spread to reduce local density
-                    ey + np.random.uniform(-2.0, 2.0),
+                    ex + self.np_random.uniform(-2.0, 2.0),  # Wider spread to reduce local density
+                    ey + self.np_random.uniform(-2.0, 2.0),
                     init_panic=0.0
                 )
 
@@ -351,10 +351,10 @@ class EnhancedCrowdControlEnvFast(gym.Env):
         else:
             rate = 1.2  # Reduced: 1.5 -> 1.2
         for _ in range(int(rate)):
-            ex, ey = self.entrances[np.random.randint(len(self.entrances))]
+            ex, ey = self.entrances[self.np_random.integers(len(self.entrances))]
             self._spawn_agent(
-                ex + np.random.uniform(-1.5, 1.5),  # Wider spread
-                ey + np.random.uniform(-1.5, 1.5),
+                ex + self.np_random.uniform(-1.5, 1.5),  # Wider spread
+                ey + self.np_random.uniform(-1.5, 1.5),
                 init_panic=0.3 if self.crowd_arrival_pattern == "evacuation" else 0.0
             )
 
@@ -584,17 +584,17 @@ class EnhancedCrowdControlEnvFast(gym.Env):
         return self._get_obs(), reward, terminated, truncated, self._get_info()
 
     def _adversarial_scenario(self):
-        if np.random.random() < 0.05:
-            scenario = np.random.choice(['gate_failure', 'sudden_rush', 'bottleneck'])
+        if self.np_random.random() < 0.05:
+            scenario = self.np_random.choice(['gate_failure', 'sudden_rush', 'bottleneck'])
             if scenario == 'gate_failure':
-                gate_id = np.random.randint(self.NUM_GATES)
+                gate_id = self.np_random.integers(self.NUM_GATES)
                 self.gates[gate_id][2] = 0.0
             elif scenario == 'sudden_rush':
                 for _ in range(15):
-                    ex, ey = self.entrances[np.random.randint(len(self.entrances))]
+                    ex, ey = self.entrances[self.np_random.integers(len(self.entrances))]
                     self._spawn_agent(
-                        ex + np.random.uniform(-3, 3),
-                        ey + np.random.uniform(-3, 3),
+                        ex + self.np_random.uniform(-3, 3),
+                        ey + self.np_random.uniform(-3, 3),
                         init_panic=0.5
                     )
             elif scenario == 'bottleneck':
