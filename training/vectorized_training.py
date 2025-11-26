@@ -107,7 +107,7 @@ def train_ppo_vectorized(timesteps=50000, n_envs=4, difficulty='medium'):
         gamma=0.99,
         gae_lambda=0.95,
         clip_range=0.2,
-        verbose=1,
+        verbose=0,
         tensorboard_log="logs/vec_ppo"
     )
     
@@ -145,7 +145,7 @@ def train_ppo_vectorized(timesteps=50000, n_envs=4, difficulty='medium'):
         done = False
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, _ = eval_env.step(action)
+            obs, reward, done,_ = eval_env.step(action)
             ep_reward += reward
             done = terminated or truncated
         eval_rewards.append(ep_reward)
@@ -223,7 +223,7 @@ def train_dqn_vectorized(timesteps=50000, n_envs=4, difficulty='medium'):
         exploration_fraction=0.3,
         exploration_initial_eps=1.0,
         exploration_final_eps=0.05,
-        verbose=1,
+        verbose=0,
         tensorboard_log="logs/vec_dqn"
     )
     
@@ -261,7 +261,7 @@ def train_dqn_vectorized(timesteps=50000, n_envs=4, difficulty='medium'):
         done = False
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, _ = eval_env.step(action)
+            obs, reward, done,_ = eval_env.step(action)
             ep_reward += reward
             done = terminated or truncated
         eval_rewards.append(ep_reward)

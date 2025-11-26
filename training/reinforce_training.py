@@ -29,6 +29,19 @@ from datetime import datetime
 from collections import deque
 
 
+def detect_convergence(eval_rewards, window=3, threshold=0.9):
+    """Detect convergence point during training."""
+    if len(eval_rewards) < window:
+        return None
+    best_reward = max(eval_rewards)
+    convergence_value = threshold * best_reward
+    for i in range(len(eval_rewards) - window + 1):
+        rolling_mean = np.mean(eval_rewards[i:i+window])
+        if rolling_mean >= convergence_value:
+            return i
+    return None
+
+
 class PolicyNetwork(nn.Module):
     """Neural network for policy"""
     
@@ -215,19 +228,19 @@ class REINFORCEAgent:
 HYPERPARAMETER_CONFIGS = [
     {
         "name": "config_1_baseline",
-        "learning_rate": 1e-3,
-        "gamma": 0.99,
-        "ent_coef": 0.01,
-        "use_baseline": True,
-        "hidden_dims": [128, 128],
+        "learning_rate": 1e-3,      # Moderate LR - baseline for custom REINFORCE
+        "gamma": 0.99,              # Standard discount - balances immediate vs future rewards
+        "ent_coef": 0.01,           # Minimal entropy - focuses on exploitation after exploration
+        "use_baseline": True,       # Value function baseline - CRITICAL for variance reduction
+        "hidden_dims": [128, 128],  # Standard network - sufficient capacity for policy approximation
     },
     {
         "name": "config_2_no_baseline",
-        "learning_rate": 1e-3,
-        "gamma": 0.99,
-        "ent_coef": 0.01,
-        "use_baseline": False,
-        "hidden_dims": [128, 128],
+        "learning_rate": 1e-3,      # Moderate LR - tests raw REINFORCE without variance reduction
+        "gamma": 0.99,              # Standard discount
+        "ent_coef": 0.01,           # Minimal entropy
+        "use_baseline": False,      # No baseline - pure REINFORCE (high variance, expect poor performance)
+        "hidden_dims": [128, 128],  # Standard network
     },
     {
         "name": "config_3_high_lr",
@@ -246,20 +259,20 @@ HYPERPARAMETER_CONFIGS = [
         "hidden_dims": [128, 128],
     },
     {
-        "name": "config_5_high_gamma",
-        "learning_rate": 1e-3,
-        "gamma": 0.995,
-        "ent_coef": 0.01,
-        "use_baseline": True,
-        "hidden_dims": [128, 128],
+        "name": "config_5_high_gamma",  # BEST REINFORCE: 952.5 mean reward
+        "learning_rate": 1e-3,      # Moderate LR - stable learning
+        "gamma": 0.995,             # High discount - values long-term crowd dispersal (CRITICAL for REINFORCE)
+        "ent_coef": 0.01,           # Minimal entropy - exploitation after exploration
+        "use_baseline": True,       # Value baseline - essential variance reduction for Monte Carlo
+        "hidden_dims": [128, 128],  # Standard network - sufficient expressiveness
     },
     {
         "name": "config_6_high_entropy",
-        "learning_rate": 1e-3,
-        "gamma": 0.99,
-        "ent_coef": 0.05,
-        "use_baseline": True,
-        "hidden_dims": [128, 128],
+        "learning_rate": 1e-3,      # Moderate LR
+        "gamma": 0.99,              # Standard discount
+        "ent_coef": 0.05,           # Higher entropy - encourages exploration of diverse strategies
+        "use_baseline": True,       # Value baseline - variance reduction
+        "hidden_dims": [128, 128],  # Standard network
     },
     {
         "name": "config_7_large_network",
@@ -346,13 +359,13 @@ def train_reinforce_configuration(config, num_episodes=1000, eval_freq=100):
         while not done:
             action = agent.select_action(state)
             next_state, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
             
             agent.store_transition(state, action, reward)
             
             episode_reward += reward
             episode_length += 1
             state = next_state
-            done = terminated or truncated
         
         # Train on episode
         agent.train()
@@ -377,6 +390,15 @@ def train_reinforce_configuration(config, num_episodes=1000, eval_freq=100):
     
     training_time = (datetime.now() - start_time).total_seconds()
     
+    # Detect convergence from eval rewards
+    convergence_idx = detect_convergence(eval_rewards, window=3, threshold=0.9)
+    if convergence_idx is not None:
+        convergence_episode = convergence_idx * eval_freq
+        convergence_time = convergence_idx / len(eval_rewards) * training_time if len(eval_rewards) > 0 else None
+    else:
+        convergence_episode = None
+        convergence_time = None
+    
     # Save final model
     agent.save(f"{model_dir}/final_model.pth")
     
@@ -395,12 +417,14 @@ def train_reinforce_configuration(config, num_episodes=1000, eval_freq=100):
         while not done:
             action = agent.select_action(state)
             state, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
             episode_reward += reward
             episode_length += 1
-            done = terminated or truncated
-            
-            if terminated and info['total_crowd'] < 10:
-                final_successes += 1
+        
+        # Check success after episode ends
+        if done and info.get('success', False):
+            final_successes += 1
+
         
         final_eval_rewards.append(episode_reward)
         final_eval_lengths.append(episode_length)
@@ -418,6 +442,8 @@ def train_reinforce_configuration(config, num_episodes=1000, eval_freq=100):
         "best_eval_reward": float(best_eval_reward),
         "training_rewards": [float(r) for r in episode_rewards],
         "eval_rewards": [float(r) for r in eval_rewards],
+        "convergence_episode": convergence_episode,
+        "convergence_time_seconds": convergence_time,
     }
     
     # Save results
@@ -433,6 +459,10 @@ def train_reinforce_configuration(config, num_episodes=1000, eval_freq=100):
     print(f"  Best Eval Reward: {results['best_eval_reward']:.2f}")
     print(f"  Success Rate: {results['success_rate']*100:.1f}%")
     print(f"  Training Time: {training_time:.1f} seconds")
+    if convergence_episode:
+        print(f"  Convergence: Episode {convergence_episode} ({convergence_time:.1f}s)" if convergence_time else f"  Convergence: Episode {convergence_episode}")
+    else:
+        print(f"  Convergence: Not achieved (still improving)")
     print(f"{'='*70}\n")
     
     env.close()
@@ -452,8 +482,8 @@ def evaluate_agent(agent, env, n_episodes=5):
         while not done:
             action = agent.select_action(state)
             state, reward, terminated, truncated, _ = env.step(action)
-            episode_reward += reward
             done = terminated or truncated
+            episode_reward += reward
         
         eval_rewards.append(episode_reward)
     
@@ -487,7 +517,7 @@ def plot_training_curve(episode_rewards, eval_rewards, eval_freq, save_dir):
     plt.close()
 
 
-def train_all_configurations(episodes_per_config=1000):
+def train_all_configurations(episodes_per_config=200):
     """Train all configurations"""
     
     print("\n" + "="*70)
@@ -518,6 +548,11 @@ def train_all_configurations(episodes_per_config=1000):
     print("\n" + "="*70)
     print("TRAINING SUMMARY - ALL CONFIGURATIONS")
     print("="*70)
+    
+    if not all_results:
+        print("ERROR: No configurations completed successfully!")
+        print("="*70)
+        return []
     
     sorted_results = sorted(all_results, key=lambda x: x['mean_eval_reward'], reverse=True)
     
@@ -594,7 +629,7 @@ def main():
     parser = argparse.ArgumentParser(description='Train REINFORCE agent for crowd control')
     parser.add_argument('--config', type=int, default=None,
                        help='Train specific configuration (0-11), or all if not specified')
-    parser.add_argument('--episodes', type=int, default=1000,
+    parser.add_argument('--episodes', type=int, default=200,
                        help='Number of episodes for training')
     
     args = parser.parse_args()

@@ -1,312 +1,432 @@
 """
-Main Entry Point for Crowd Control RL Project
-==============================================
+Enhanced Crowd Control Environment Demo
+========================================
 
-Run trained models with full visualization and evaluation.
+Demonstrates the crowd control environment with 3D visualization.
+Shows individual agents with panic-based coloring and interactive controls.
 
 Usage:
-    python main.py --algorithm dqn --model models/dqn/best_model
-    python main.py --algorithm ppo --config config_1_baseline
-    python main.py --compare  # Compare all algorithms
+    python demo.py [--pattern PATTERN] [--difficulty DIFFICULTY] [--adversarial]
+
+Patterns: rush, steady, evacuation
+Difficulty: easy, medium, hard
 """
 
+import argparse
+import numpy as np
+import time
+from typing import Optional
+
+# Import environment and renderer
+# Assuming the files are named:
+# - enhanced_crowd_control_env.py (contains EnhancedCrowdControlEnvFast)
+# - enhanced_rendering.py (contains EnhancedCrowdRenderer)
 import sys
 import os
-import argparse
-from environment.custom_env import CrowdControlEnv
-import time
-import numpy as np
-import json
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from environment.enhanced_env_fast import EnhancedCrowdControlEnvFast
+
+from environment.enhanced_rendering import EnhancedCrowdRenderer
+
+# Import RL libraries for model loading
+try:
+    from stable_baselines3 import PPO, DQN, A2C, SAC
+    SB3_AVAILABLE = True
+except ImportError:
+    SB3_AVAILABLE = False
+    print("Warning: stable-baselines3 not available. Model loading disabled.")
 
 
-def load_sb3_model(algorithm, model_path):
-    """Load Stable-Baselines3 model"""
-    if algorithm == 'dqn':
-        from stable_baselines3 import DQN
-        return DQN.load(model_path)
-    elif algorithm == 'ppo':
-        from stable_baselines3 import PPO
-        return PPO.load(model_path)
-    elif algorithm == 'a2c':
-        from stable_baselines3 import A2C
-        return A2C.load(model_path)
+def load_sb3_model(model_path: str, env):
+    """Load a Stable-Baselines3 model"""
+    if not SB3_AVAILABLE:
+        raise ImportError("stable-baselines3 not installed")
+    
+    # Try to detect algorithm from path
+    if 'ppo' in model_path.lower():
+        return PPO.load(model_path, env=env)
+    elif 'dqn' in model_path.lower():
+        return DQN.load(model_path, env=env)
+    elif 'a2c' in model_path.lower():
+        return A2C.load(model_path, env=env)
+    elif 'sac' in model_path.lower():
+        return SAC.load(model_path, env=env)
     else:
-        raise ValueError(f"Unknown algorithm: {algorithm}")
-
-
-def load_reinforce_model(model_path, env):
-    """Load REINFORCE model"""
-    from training.reinforce_training import REINFORCEAgent
-    import torch
-    
-    # Load config
-    model_dir = os.path.dirname(model_path)
-    with open(os.path.join(model_dir, 'results.json'), 'r') as f:
-        results = json.load(f)
-    
-    config = results['hyperparameters']
-    
-    # Create agent
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
-    agent = REINFORCEAgent(state_dim, action_dim, config)
-    
-    # Load weights
-    agent.load(model_path)
-    
-    return agent
-
-
-def run_trained_agent(algorithm, model_path, num_episodes=5, render=True):
-    """Run trained agent and display performance"""
-    
-    print("\n" + "="*70)
-    print(f"RUNNING TRAINED {algorithm.upper()} AGENT")
-    print("="*70)
-    print(f"Model: {model_path}")
-    print(f"Episodes: {num_episodes}")
-    print("="*70)
-    
-    # Create environment
-    render_mode = 'human' if render else None
-    env = CrowdControlEnv(render_mode=render_mode)
-    
-    # Load model
-    if algorithm in ['dqn', 'ppo', 'a2c']:
-        model = load_sb3_model(algorithm, model_path)
-        use_sb3 = True
-    elif algorithm == 'reinforce':
-        model = load_reinforce_model(model_path, env)
-        use_sb3 = False
-    else:
-        raise ValueError(f"Unknown algorithm: {algorithm}")
-    
-    # Run episodes
-    all_rewards = []
-    all_lengths = []
-    all_successes = []
-    all_max_densities = []
-    
-    for episode in range(num_episodes):
-        print(f"\n{'='*70}")
-        print(f"Episode {episode + 1}/{num_episodes}")
-        print("="*70)
-        
-        obs, info = env.reset()
-        episode_reward = 0
-        episode_length = 0
-        done = False
-        
-        print(f"Initial State:")
-        print(f"  Total Crowd: {info['total_crowd']:.1f}")
-        print(f"  Max Density: {info['max_density']:.2f}")
-        print(f"  Open Gates: {info['open_gates']}/{env.NUM_GATES}")
-        
-        while not done:
-            # Get action from model
-            if use_sb3:
-                action, _ = model.predict(obs, deterministic=True)
-            else:
-                action = model.select_action(obs)
-            
-            # Execute action
-            obs, reward, terminated, truncated, info = env.step(action)
-            episode_reward += reward
-            episode_length += 1
-            done = terminated or truncated
-            
-            # Render
-            if render:
-                env.render()
-                time.sleep(0.05)  # Slow down for visualization
-            
-            # Print periodic updates
-            if episode_length % 100 == 0:
-                print(f"\nStep {episode_length}:")
-                print(f"  Total Crowd: {info['total_crowd']:.1f}")
-                print(f"  Max Density: {info['max_density']:.2f}")
-                print(f"  Cumulative Reward: {episode_reward:.2f}")
-        
-        # Episode complete
-        success = terminated and info['total_crowd'] < 10
-        
-        print(f"\nEpisode Complete:")
-        print(f"  Length: {episode_length} steps")
-        print(f"  Total Reward: {episode_reward:.2f}")
-        print(f"  Final Crowd: {info['total_crowd']:.1f}")
-        print(f"  Max Density Reached: {info['max_density_reached']:.2f}")
-        print(f"  Overcrowding Events: {info['overcrowding_events']}")
-        print(f"  Result: {'SUCCESS' if success else 'FAILURE'}")
-        
-        all_rewards.append(episode_reward)
-        all_lengths.append(episode_length)
-        all_successes.append(1 if success else 0)
-        all_max_densities.append(info['max_density_reached'])
-    
-    # Summary statistics
-    print("\n" + "="*70)
-    print("PERFORMANCE SUMMARY")
-    print("="*70)
-    print(f"Mean Reward: {np.mean(all_rewards):.2f} ± {np.std(all_rewards):.2f}")
-    print(f"Mean Episode Length: {np.mean(all_lengths):.1f} ± {np.std(all_lengths):.1f}")
-    print(f"Success Rate: {np.mean(all_successes)*100:.1f}%")
-    print(f"Mean Max Density: {np.mean(all_max_densities):.2f}")
-    print("="*70)
-    
-    if render:
-        input("\nPress Enter to exit...")
-    
-    env.close()
-    
-    return {
-        'mean_reward': float(np.mean(all_rewards)),
-        'std_reward': float(np.std(all_rewards)),
-        'mean_length': float(np.mean(all_lengths)),
-        'success_rate': float(np.mean(all_successes)),
-        'mean_max_density': float(np.mean(all_max_densities)),
-    }
-
-
-def compare_algorithms():
-    """Compare performance of all trained algorithms"""
-    
-    print("\n" + "="*70)
-    print("COMPARING ALL ALGORITHMS")
-    print("="*70)
-    
-    algorithms = {
-        'DQN': 'models/dqn/config_1_baseline/best_model',
-        'PPO': 'models/ppo/config_1_baseline/best_model',
-        'A2C': 'models/a2c/config_1_baseline/best_model',
-        'REINFORCE': 'models/reinforce/config_1_baseline/best_model.pth',
-    }
-    
-    results = {}
-    
-    for name, model_path in algorithms.items():
-        print(f"\nEvaluating {name}...")
-        
-        # Check if model exists
-        if not os.path.exists(model_path + '.zip') and not os.path.exists(model_path):
-            print(f"  Model not found: {model_path}")
-            continue
-        
+        # Try PPO as default
         try:
-            algo = name.lower()
-            result = run_trained_agent(algo, model_path, num_episodes=10, render=False)
-            results[name] = result
-        except Exception as e:
-            print(f"  Error: {e}")
-            continue
-    
-    # Print comparison
-    print("\n" + "="*70)
-    print("ALGORITHM COMPARISON")
-    print("="*70)
-    print(f"{'Algorithm':<15} {'Mean Reward':<15} {'Success Rate':<15} {'Avg Length':<15}")
-    print("-"*70)
-    
-    for name, result in sorted(results.items(), key=lambda x: x[1]['mean_reward'], reverse=True):
-        print(f"{name:<15} {result['mean_reward']:>8.2f} ± {result['std_reward']:<4.2f}  "
-              f"{result['success_rate']*100:>6.1f}%          "
-              f"{result['mean_length']:>8.1f}")
-    
-    print("="*70)
-    
-    # Find best
-    best_algo = max(results.items(), key=lambda x: x[1]['mean_reward'])
-    print(f"\nBest Algorithm: {best_algo[0]}")
-    print(f"Mean Reward: {best_algo[1]['mean_reward']:.2f}")
-    print(f"Success Rate: {best_algo[1]['success_rate']*100:.1f}%")
-    
-    return results
+            return PPO.load(model_path, env=env)
+        except:
+            try:
+                return DQN.load(model_path, env=env)
+            except:
+                raise ValueError(f"Could not load model from {model_path}")
 
 
-def find_best_model(algorithm):
-    """Find the best model for an algorithm"""
-    results_path = f"models/{algorithm}/all_results.json"
+class CrowdControlDemo:
+    """Demo runner (now supports RL model policy)"""
     
-    if not os.path.exists(results_path):
-        print(f"No results found for {algorithm}")
-        return None
+    def __init__(self, 
+                 pattern="rush",
+                 difficulty="medium",
+                 adversarial=False,
+                 use_renderer=True,
+                 model_path: Optional[str] = None):
+
+        self.pattern = pattern
+        self.difficulty = difficulty
+        self.adversarial = adversarial
+        self.use_renderer = use_renderer
+
+        print(f"Creating environment:")
+        print(f"  Pattern: {pattern}")
+        print(f"  Difficulty: {difficulty}")
+        print(f"  Adversarial: {adversarial}")
+        print()
+
+        self.env = EnhancedCrowdControlEnvFast(
+            render_mode="human" if use_renderer else None,
+            crowd_arrival_pattern=pattern,
+            adversarial_mode=adversarial,
+            difficulty=difficulty
+        )
+
+        # Renderer
+        self.renderer = None
+        if use_renderer:
+            try:
+                self.renderer = EnhancedCrowdRenderer(self.env)
+                print("3D Renderer initialized successfully.\n")
+            except Exception as e:
+                print(f"Renderer init failed: {e}")
+                self.use_renderer = False
+
+        # Load RL model if provided
+        self.model = None
+        if model_path:
+            print(f"Loading model from: {model_path}")
+            self.model = load_sb3_model(model_path, self.env)
+            print("Model loaded!\n")
+
+        self.episode_count = 0
+        self.best_score = float('-inf')
+
+    # ========================================================================
+    # NEW: RL Model Policy
+    # ========================================================================
+    def run_model_policy(self, num_episodes=3, max_steps=None):
+
+        if self.model is None:
+            raise RuntimeError("No model loaded! Use --model-path <file>")
+
+        print(f"Running {num_episodes} episodes with model policy...")
+        print("=" * 60)
+
+        for episode in range(num_episodes):
+            self.episode_count += 1
+            obs, info = self.env.reset()
+
+            episode_reward = 0
+            step = 0
+            done = False
+
+            print(f"\n[Episode {self.episode_count}]")
+
+            while not done:
+
+                # Model chooses action
+                action, _ = self.model.predict(obs, deterministic=True)
+
+                # Step environment
+                obs, reward, terminated, truncated, info = self.env.step(action)
+                episode_reward += reward
+                done = terminated or truncated
+                step += 1
+
+                # Renderer update
+                if self.renderer:
+                    self.renderer.update_scene(
+                        agents=self.env.agents,
+                        gates=self.env.gates,
+                        barriers=self.env.barriers,
+                        info=info,
+                    )
+                    self.renderer.taskMgr.step()
+                    time.sleep(0.05)  # INCREASED: Was 0.01 - slower visualization (50ms per frame)
+
+                if step % 50 == 0:
+                    self._print_status(step, info, episode_reward, action)
+
+                if max_steps and step >= max_steps:
+                    done = True
+
+            self._print_episode_summary(step, episode_reward, info)
+            self.best_score = max(self.best_score, episode_reward)
+
+        print("\nDemo complete! Best score:", self.best_score)
     
-    with open(results_path, 'r') as f:
-        all_results = json.load(f)
+    def run_random_policy(self, num_episodes: int = 3, max_steps: Optional[int] = None):
+        """
+        Run episodes with a random policy
+        
+        Args:
+            num_episodes: Number of episodes to run
+            max_steps: Maximum steps per episode (None = use env default)
+        """
+        print(f"Running {num_episodes} episodes with random policy...")
+        print("=" * 60)
+        
+        for episode in range(num_episodes):
+            self.episode_count += 1
+            obs, info = self.env.reset()
+            
+            episode_reward = 0
+            step = 0
+            done = False
+            
+            print(f"\n[Episode {self.episode_count}]")
+            
+            while not done:
+                # Random action
+                action = self.env.action_space.sample()
+                
+                # Step environment
+                obs, reward, terminated, truncated, info = self.env.step(action)
+                episode_reward += reward
+                step += 1
+                done = terminated or truncated
+                
+                # Update renderer
+                if self.renderer is not None:
+                    self.renderer.update_scene(
+                        agents=self.env.agents,
+                        gates=self.env.gates,
+                        barriers=self.env.barriers,
+                        info=info
+                    )
+                    
+                    # Process Panda3D events
+                    self.renderer.taskMgr.step()
+                
+                # Print progress every 50 steps
+                if step % 50 == 0:
+                    self._print_status(step, info, episode_reward, action)
+                
+                # Respect max_steps if provided
+                if max_steps and step >= max_steps:
+                    done = True
+                
+                # Small delay for visualization
+                if self.renderer is not None:
+                    time.sleep(0.05)
+            
+            # Episode summary
+            self._print_episode_summary(step, episode_reward, info)
+            
+            if episode_reward > self.best_score:
+                self.best_score = episode_reward
+        
+        print("\n" + "=" * 60)
+        print(f"Demo complete! Best score: {self.best_score:.2f}")
     
-    # Find best configuration
-    best_config = max(all_results, key=lambda x: x['mean_eval_reward'])
+    def run_heuristic_policy(self, num_episodes: int = 3, max_steps: Optional[int] = None):
+        """
+        Run episodes with a simple heuristic policy
+        
+        Heuristic strategy:
+        - Open all gates when density is high
+        - Close gates when crowd is manageable
+        - Move barriers away from high-density areas
+        """
+        print(f"Running {num_episodes} episodes with heuristic policy...")
+        print("=" * 60)
+        
+        for episode in range(num_episodes):
+            self.episode_count += 1
+            obs, info = self.env.reset()
+            
+            episode_reward = 0
+            step = 0
+            done = False
+            
+            print(f"\n[Episode {self.episode_count}]")
+            
+            while not done:
+                # Heuristic decision making
+                max_density = info.get('max_density', 0)
+                avg_panic = info.get('avg_panic', 0)
+                num_agents = info.get('agents', 0)
+                
+                # Decision logic
+                if max_density > self.env.CRITICAL_DENSITY * 0.7 or avg_panic > 0.6:
+                    # Emergency: open all gates
+                    action = 11
+                elif max_density > self.env.TARGET_DENSITY * 1.5:
+                    # High density: open a gate or move barrier
+                    if np.random.random() < 0.7:
+                        action = np.random.randint(4, 7)  # Toggle gate
+                    else:
+                        action = np.random.randint(0, 4)  # Move barrier
+                elif num_agents < 30:
+                    # Low crowd: maintain current state
+                    action = 10  # No-op (or minimal intervention)
+                else:
+                    # Normal operation: occasional adjustments
+                    action = np.random.choice([10, np.random.randint(0, 4)])
+                
+                # Step environment
+                obs, reward, terminated, truncated, info = self.env.step(action)
+                episode_reward += reward
+                step += 1
+                done = terminated or truncated
+                
+                # Update renderer
+                if self.renderer is not None:
+                    self.renderer.update_scene(
+                        agents=self.env.agents,
+                        gates=self.env.gates,
+                        barriers=self.env.barriers,
+                        info=info
+                    )
+                    self.renderer.taskMgr.step()
+                
+                # Print progress
+                if step % 50 == 0:
+                    self._print_status(step, info, episode_reward, action)
+                
+                if max_steps and step >= max_steps:
+                    done = True
+                
+                if self.renderer is not None:
+                    time.sleep(0.01)
+            
+            self._print_episode_summary(step, episode_reward, info)
+            
+            if episode_reward > self.best_score:
+                self.best_score = episode_reward
+        
+        print("\n" + "=" * 60)
+        print(f"Demo complete! Best score: {self.best_score:.2f}")
     
-    config_name = best_config['config_name']
+    def _print_status(self, step: int, info: dict, reward: float, action):
+        """Print current status"""
+        print(f"  Step {step:3d} | "
+              f"Agents: {info.get('agents', 0):3d} | "
+              f"Exited: {info.get('exited', 0):3d} | "
+              f"Density: {info.get('max_density', 0):.2f} | "
+              f"Panic: {info.get('avg_panic', 0):.2f} | "
+              f"Reward: {reward:7.2f} | "
+              f"Action: {action:7.2f}")
     
-    if algorithm == 'reinforce':
-        model_path = f"models/{algorithm}/{config_name}/best_model.pth"
-    else:
-        model_path = f"models/{algorithm}/{config_name}/best_model"
+    def _print_episode_summary(self, steps: int, reward: float, info: dict):
+        """Print episode summary"""
+        print(f"\n  Episode Summary:")
+        print(f"    Steps: {steps}")
+        print(f"    Total Reward: {reward:.2f}")
+        print(f"    Agents Spawned: {info.get('spawned', 0)}")
+        print(f"    Agents Exited: {info.get('exited', 0)}")
+        print(f"    Final Density: {info.get('max_density', 0):.2f}")
+        print(f"    Overcrowding Events: {info.get('overcrowding_events', 0)}")
+        
+        # Termination reason
+        if hasattr(self.env, '_terminal_reason'):
+            print(f"    Termination: {self.env._terminal_reason}")
     
-    return model_path, best_config
+    def close(self):
+        """Clean up resources"""
+        if self.renderer is not None:
+            self.renderer.close()
+        self.env.close()
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Run trained crowd control RL agent')
-    
-    parser.add_argument('--algorithm', type=str, choices=['dqn', 'ppo', 'a2c', 'reinforce'],
-                       help='Algorithm to run')
-    parser.add_argument('--model', type=str,
-                       help='Path to trained model')
-    parser.add_argument('--config', type=str,
-                       help='Configuration name (e.g., config_1_baseline)')
-    parser.add_argument('--best', action='store_true',
-                       help='Run the best performing model for the algorithm')
-    parser.add_argument('--compare', action='store_true',
-                       help='Compare all algorithms')
-    parser.add_argument('--episodes', type=int, default=5,
-                       help='Number of episodes to run')
-    parser.add_argument('--no-render', action='store_true',
-                       help='Disable rendering')
+    """Main entry point"""
+    parser = argparse.ArgumentParser(
+        description="Enhanced Crowd Control Environment Demo"
+    )
+    parser.add_argument(
+        "--pattern",
+        type=str,
+        default="rush",
+        choices=["rush", "steady", "evacuation"],
+        help="Crowd arrival pattern"
+    )
+    parser.add_argument(
+        "--difficulty",
+        type=str,
+        default="medium",
+        choices=["easy", "medium", "hard"],
+        help="Difficulty level"
+    )
+    parser.add_argument(
+        "--adversarial",
+        action="store_true",
+        help="Enable adversarial scenarios"
+    )
+    parser.add_argument(
+        "--policy",
+        type=str,
+        default="random",
+        choices=["random", "heuristic"],
+        help="Policy to use for demo"
+    )
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        default=3,
+        help="Number of episodes to run"
+    )
+    parser.add_argument(
+        "--no-render",
+        action="store_true",
+        help="Disable 3D rendering"
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=None,
+        help="Maximum steps per episode"
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Path to trained model (.zip file)"
+    )
     
     args = parser.parse_args()
     
-    if args.compare:
-        # Compare all algorithms
-        compare_algorithms()
+    # Create demo
+    demo = CrowdControlDemo(
+        pattern=args.pattern,
+        difficulty=args.difficulty,
+        adversarial=args.adversarial,
+        use_renderer=not args.no_render,
+        model_path=args.model
+    )
     
-    elif args.algorithm:
-        # Determine model path
+    try:
+        # Run demo with selected policy
         if args.model:
-            model_path = args.model
-        elif args.best:
-            result = find_best_model(args.algorithm)
-            if result is None:
-                print(f"Could not find best model for {args.algorithm}")
-                return
-            model_path, best_config = result
-            print(f"\nUsing best configuration: {best_config['config_name']}")
-            print(f"Training reward: {best_config['mean_eval_reward']:.2f}")
-        elif args.config:
-            if args.algorithm == 'reinforce':
-                model_path = f"models/{args.algorithm}/{args.config}/best_model.pth"
-            else:
-                model_path = f"models/{args.algorithm}/{args.config}/best_model"
+            # Use trained model
+            demo.run_model_policy(
+                num_episodes=args.episodes,
+                max_steps=args.max_steps
+            )
+        elif args.policy == "random":
+            demo.run_random_policy(
+                num_episodes=args.episodes,
+                max_steps=args.max_steps
+            )
         else:
-            print("Error: Must specify --model, --config, or --best")
-            return
-        
-        # Check if model exists
-        if not os.path.exists(model_path + '.zip') and not os.path.exists(model_path):
-            print(f"Error: Model not found: {model_path}")
-            return
-        
-        # Run the agent
-        run_trained_agent(
-            args.algorithm,
-            model_path,
-            num_episodes=args.episodes,
-            render=not args.no_render
-        )
-    
-    else:
-        print("Error: Must specify --algorithm or --compare")
-        parser.print_help()
+            demo.run_heuristic_policy(
+                num_episodes=args.episodes,
+                max_steps=args.max_steps
+            )
+    except KeyboardInterrupt:
+        print("\n\nDemo interrupted by user")
+    finally:
+        demo.close()
 
 
 if __name__ == "__main__":

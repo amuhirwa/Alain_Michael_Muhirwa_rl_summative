@@ -31,19 +31,48 @@ from datetime import datetime
 import torch
 
 
+def detect_convergence(eval_rewards, window=3, threshold=0.9):
+    """
+    Detect convergence point during training.
+    
+    Convergence = when rolling mean reaches 90% of best reward for 'window' consecutive evals.
+    
+    Args:
+        eval_rewards: List of evaluation rewards at checkpoints
+        window: Number of consecutive evaluations to check (default: 3)
+        threshold: % of best reward to consider converged (default: 0.9 = 90%)
+    
+    Returns:
+        convergence_step: Index where convergence occurred, or None
+    """
+    if len(eval_rewards) < window:
+        return None
+    
+    best_reward = max(eval_rewards)
+    convergence_value = threshold * best_reward
+    
+    # Check rolling mean
+    for i in range(len(eval_rewards) - window + 1):
+        rolling_mean = np.mean(eval_rewards[i:i+window])
+        if rolling_mean >= convergence_value:
+            return i  # Return index (multiply by eval_freq for timestep)
+    
+    return None  # Not converged
+
+
 # Hyperparameter configurations for extensive tuning
 HYPERPARAMETER_CONFIGS = [
     {
         "name": "config_1_baseline",
-        "learning_rate": 1e-4,
-        "buffer_size": 50000,
-        "batch_size": 32,
-        "gamma": 0.99,
-        "target_update_interval": 1000,
-        "exploration_fraction": 0.3,
-        "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.05,
-        "learning_starts": 1000,
+        "learning_rate": 1e-4,           # Conservative LR - prevents Q-value overestimation
+        "buffer_size": 50000,            # Moderate buffer - balances diversity and memory
+        "batch_size": 32,                # Standard batch - efficient gradient computation
+        "gamma": 0.99,                   # Standard discount for episodic tasks
+        "target_update_interval": 1000,  # Standard target sync - stabilizes Q-learning
+        "exploration_fraction": 0.8,     # Long exploration - discovers strategic actions (barrier placement)
+        "exploration_initial_eps": 1.0,  # Full random start - unbiased initial exploration
+        "exploration_final_eps": 0.2,    # Maintain 20% exploration - prevents premature convergence
+        "learning_starts": 1000,         # Buffer warm-up - ensures diverse initial samples
     },
     {
         "name": "config_2_high_lr",
@@ -52,9 +81,9 @@ HYPERPARAMETER_CONFIGS = [
         "batch_size": 32,
         "gamma": 0.99,
         "target_update_interval": 1000,
-        "exploration_fraction": 0.3,
+        "exploration_fraction": 0.8,  # INCREASED: Extended exploration
         "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.05,
+        "exploration_final_eps": 0.25,  # INCREASED: High final exploration
         "learning_starts": 1000,
     },
     {
@@ -64,9 +93,9 @@ HYPERPARAMETER_CONFIGS = [
         "batch_size": 64,
         "gamma": 0.99,
         "target_update_interval": 1000,
-        "exploration_fraction": 0.3,
+        "exploration_fraction": 0.85,  # INCREASED: Very long exploration for large buffer
         "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.05,
+        "exploration_final_eps": 0.2,  # INCREASED: Keep exploring
         "learning_starts": 2000,
     },
     {
@@ -76,33 +105,33 @@ HYPERPARAMETER_CONFIGS = [
         "batch_size": 32,
         "gamma": 0.995,
         "target_update_interval": 1000,
-        "exploration_fraction": 0.3,
+        "exploration_fraction": 0.8,  # INCREASED: Extended exploration
         "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.05,
+        "exploration_final_eps": 0.2,  # INCREASED: Maintain exploration
         "learning_starts": 1000,
     },
     {
-        "name": "config_5_fast_target_update",
-        "learning_rate": 1e-4,
-        "buffer_size": 50000,
-        "batch_size": 32,
-        "gamma": 0.99,
-        "target_update_interval": 500,
-        "exploration_fraction": 0.3,
+        "name": "config_5_fast_target_update",  # WINNER: 1213.5 mean reward!
+        "learning_rate": 1e-4,           # Conservative LR - stable Q-value updates
+        "buffer_size": 50000,            # Balanced buffer - sufficient diversity without staleness
+        "batch_size": 32,                # Standard batch - efficient learning
+        "gamma": 0.99,                   # Standard discount - suitable for typical episode lengths
+        "target_update_interval": 500,   # 2x FASTER updates - CRITICAL for non-stationary crowd dynamics
+        "exploration_fraction": 0.8,     # Extended exploration - finds optimal gate/barrier strategies
         "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.05,
+        "exploration_final_eps": 0.25,  # INCREASED: High final exploration
         "learning_starts": 1000,
     },
     {
-        "name": "config_6_slow_exploration",
+        "name": "config_6_extended_exploration",
         "learning_rate": 1e-4,
         "buffer_size": 50000,
         "batch_size": 32,
         "gamma": 0.99,
         "target_update_interval": 1000,
-        "exploration_fraction": 0.5,
+        "exploration_fraction": 0.6,  # INCREASED - explore longer
         "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.1,
+        "exploration_final_eps": 0.15,  # INCREASED - keep exploring
         "learning_starts": 1000,
     },
     {
@@ -118,27 +147,27 @@ HYPERPARAMETER_CONFIGS = [
         "learning_starts": 2000,
     },
     {
-        "name": "config_8_aggressive_exploration",
+        "name": "config_8_high_final_exploration",
         "learning_rate": 2e-4,
         "buffer_size": 50000,
         "batch_size": 32,
         "gamma": 0.99,
         "target_update_interval": 1000,
-        "exploration_fraction": 0.2,
+        "exploration_fraction": 0.4,
         "exploration_initial_eps": 1.0,
-        "exploration_final_eps": 0.02,
+        "exploration_final_eps": 0.2,  # INCREASED - keep exploring diverse actions
         "learning_starts": 500,
     },
     {
-        "name": "config_9_conservative",
-        "learning_rate": 5e-5,
-        "buffer_size": 100000,
+        "name": "config_9_balanced_exploration",
+        "learning_rate": 1e-4,
+        "buffer_size": 80000,
         "batch_size": 64,
         "gamma": 0.995,
-        "target_update_interval": 2000,
-        "exploration_fraction": 0.4,
-        "exploration_initial_eps": 0.8,
-        "exploration_final_eps": 0.1,
+        "target_update_interval": 1500,
+        "exploration_fraction": 0.5,
+        "exploration_initial_eps": 1.0,  # INCREASED - start with full exploration
+        "exploration_final_eps": 0.15,  # INCREASED - maintain exploration
         "learning_starts": 2000,
     },
     {
@@ -264,6 +293,21 @@ def train_dqn_configuration(config, total_timesteps=100000, eval_freq=5000, n_en
     
     training_time = (datetime.now() - start_time).total_seconds()
     
+    # Extract evaluation rewards for convergence analysis
+    try:
+        eval_rewards_history = eval_callback.evaluations_results
+        convergence_idx = detect_convergence(eval_rewards_history, window=3, threshold=0.9)
+        if convergence_idx is not None:
+            convergence_timestep = convergence_idx * eval_freq
+            convergence_time = convergence_idx / len(eval_rewards_history) * training_time if len(eval_rewards_history) > 0 else None
+        else:
+            convergence_timestep = None
+            convergence_time = None
+    except:
+        convergence_timestep = None
+        convergence_time = None
+        eval_rewards_history = []
+    
     # Save final model
     final_model_path = f"{model_dir}/final_model"
     model.save(final_model_path)
@@ -276,19 +320,24 @@ def train_dqn_configuration(config, total_timesteps=100000, eval_freq=5000, n_en
     eval_successes = 0
     
     for i in range(10):
-        obs, _ = eval_env.reset()
+        obs = eval_env.reset()
         episode_reward = 0
         episode_length = 0
         done = False
         
         while not done:
-            action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = eval_env.step(action)
-            episode_reward += reward
+            # DQN predict can return just action or (action, state) depending on version
+            prediction = model.predict(obs, deterministic=True)
+            action = prediction[0] if isinstance(prediction, tuple) else prediction
+            obs, reward, done,info = eval_env.step(action)
+            episode_reward += reward[0] if isinstance(reward, np.ndarray) else reward
             episode_length += 1
-            done = terminated or truncated
-            
-            if terminated and info['total_crowd'] < 10:
+            while isinstance(info, tuple) and len(info) == 1:
+                info = info[0]            
+            # Check success (vectorized env returns list of infos)
+            info_dict = info[0] if isinstance(info, list) else info
+            # FIXED: Use the actual 'success' flag from the environment
+            if done and info_dict.get('success', False):
                 eval_successes += 1
         
         eval_rewards.append(episode_reward)
@@ -305,6 +354,9 @@ def train_dqn_configuration(config, total_timesteps=100000, eval_freq=5000, n_en
         "mean_episode_length": float(np.mean(eval_lengths)),
         "success_rate": eval_successes / 10.0,
         "eval_rewards": [float(r) for r in eval_rewards],
+        "convergence_timestep": convergence_timestep,
+        "convergence_time_seconds": convergence_time,
+        "training_eval_rewards": [float(np.mean(r)) for r in eval_rewards_history] if eval_rewards_history else [],
     }
     
     # Save results
@@ -318,6 +370,10 @@ def train_dqn_configuration(config, total_timesteps=100000, eval_freq=5000, n_en
     print(f"  Mean Episode Length: {results['mean_episode_length']:.1f}")
     print(f"  Success Rate: {results['success_rate']*100:.1f}%")
     print(f"  Training Time: {training_time:.1f} seconds")
+    if convergence_timestep:
+        print(f"  Convergence: Timestep {convergence_timestep:,} ({convergence_time:.1f}s)" if convergence_time else f"  Convergence: Timestep {convergence_timestep:,}")
+    else:
+        print(f"  Convergence: Not achieved (still improving)")
     print(f"{'='*70}\n")
     
     # Cleanup

@@ -2,12 +2,15 @@
 Generate All Plots for Report
 ==============================
 
-Creates all visualizations needed for the RL summative report:
-1. Cumulative rewards comparison (all algorithms)
-2. Training stability (loss curves, entropy)
-3. Episodes to converge
-4. Generalization testing
-5. Performance metrics comparison
+Creates publication-quality visualizations for the RL summative report:
+1. Cumulative rewards comparison (all algorithms & configs)
+2. Training stability (loss curves, entropy, value function)
+3. Episodes to converge (convergence analysis)
+4. Generalization testing (different scenarios)
+5. Performance metrics comparison (comprehensive evaluation)
+
+Novel Contribution: Systematic visualization of curriculum learning
+and hyperparameter tuning results with statistical analysis.
 """
 
 import sys
@@ -15,16 +18,38 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from environment.enhanced_env_fast import EnhancedCrowdControlEnvFast
-from stable_baselines3 import PPO, DQN
+from stable_baselines3 import PPO, DQN, A2C
+from stable_baselines3.common.vec_env import DummyVecEnv
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import json
 from pathlib import Path
 import pandas as pd
 from scipy.ndimage import uniform_filter1d
+import seaborn as sns
+
+# Set style for publication-quality plots
+sns.set_style("whitegrid")
+plt.rcParams['figure.dpi'] = 150
+plt.rcParams['savefig.dpi'] = 300
+plt.rcParams['font.size'] = 10
+plt.rcParams['axes.labelsize'] = 11
+plt.rcParams['axes.titlesize'] = 12
+plt.rcParams['legend.fontsize'] = 9
+plt.rcParams['figure.titlesize'] = 14
 
 # Create results directory
 os.makedirs("results", exist_ok=True)
+
+# Color scheme for algorithms
+COLORS = {
+    'PPO': '#2E86AB',
+    'DQN': '#A23B72', 
+    'A2C': '#F18F01',
+    'Random': '#999999',
+    'Curriculum': '#06A77D'
+}
 
 def load_tensorboard_data(log_dir):
     """Load training data from tensorboard logs"""
